@@ -151,3 +151,43 @@ describe("CRUD citas", () => {
     expect(res.status).toBe(404);
   });
 });
+
+describe("Estado de cita", () => {
+  test("agendada -> atendida, y atendida no se reabre", async () => {
+    const h = await headers();
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 12);
+    fecha.setHours(16, 0, 0, Math.floor(Math.random() * 999));
+
+    const creada = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, profesionalId, fechaHora: fecha.toISOString() }),
+    });
+    const { id } = await creada.json<{ id: number }>();
+
+    const ok = await app.request(`/citas/${id}`, {
+      method: "PATCH",
+      headers: h,
+      body: JSON.stringify({ estado: "atendida" }),
+    });
+    expect(ok.status).toBe(200);
+
+    const reabrir = await app.request(`/citas/${id}`, {
+      method: "PATCH",
+      headers: h,
+      body: JSON.stringify({ estado: "agendada" }),
+    });
+    expect(reabrir.status).toBe(409);
+  });
+
+  test("estado inválido devuelve 400", async () => {
+    const h = await headers();
+    const res = await app.request("/citas/1", {
+      method: "PATCH",
+      headers: h,
+      body: JSON.stringify({ estado: "inventado" }),
+    });
+    expect(res.status).toBe(400);
+  });
+});

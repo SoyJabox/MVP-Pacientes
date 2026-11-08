@@ -59,29 +59,40 @@
 - [x] Medicación asociada a consulta
 - [x] Recepción NO ve datos clínicos (403 en API + mensaje en UI, verificado en navegador)
 
-## Phase 5: Documentos + CDA
-- [ ] Task 22: Esquema Drizzle — `documentos`
-- [ ] Task 23: API subida de archivos
-- [ ] Task 24: Generador CDA nivel 1 (xmlbuilder2)
-- [ ] Task 25: Nuxt vista documentos
+## Phase 5: Documentos + CDA ✅
+- [x] Task 22: Esquema Drizzle — `documentos`
+- [x] Task 23: API subida de archivos (MIME + tamaño, UUID en disco, 0600)
+- [x] Task 24: Generador CDA nivel 1 (xmlbuilder2)
+- [x] Task 25: Nuxt vista documentos
 
-### Checkpoint: Documentos
-- [ ] Subir/descargar PDF
-- [ ] CDA nivel 1 válido
+### Checkpoint: Documentos ✅
+- [x] Subir/descargar PDF (integridad byte a byte verificada)
+- [x] CDA nivel 1 válido (realmCode UY, templateId Salud.uy, secciones)
 
-## Phase 6: Hardening + Backup
-- [ ] Task 26: Tests RBAC exhaustivos
-- [ ] Task 27: Script backup pg_dump
-- [ ] Task 28: Prueba restauración
+## Phase 6: Hardening + Backup ✅
+- [x] Task 26: Matriz RBAC exhaustiva (31 casos rol × endpoint)
+- [x] Task 27: Script backup pg_dump con verificación del dump
+- [x] Task 28: Prueba de restauración real (conteos comparados por tabla)
 
-### Checkpoint: Seguridad
-- [ ] Tests RBAC pasan
-- [ ] Backup funciona
+### Checkpoint: Seguridad ✅
+- [x] Tests RBAC pasan (64 tests en total)
+- [x] Backup y restauración verificados
+
+## Phase 6b: Diseño y pulido ✅
+- [x] Sistema de estilos compartido (tokens, controles, tablas, estados)
+- [x] Layout persistente con navegación activa
+- [x] Responsive sin desborde en las 6 rutas (390px)
+- [x] Estados: hover, focus, disabled, vacío, error, carga
+- [x] Página de error 404
+- [x] Cita → atendida (estado terminal)
+- [x] README con puesta en marcha y operación
+- [x] Build de producción OK
 
 ## Phase 7: Piloto
-- [ ] Task 29: Cargar pacientes de prueba
+- [ ] Task 29: Cargar 5-10 pacientes reales
 - [ ] Task 30: Correcciones post-piloto
 
 ### Checkpoint: Complete
-- [ ] Todo funciona
-- [ ] Piloto completado
+- [x] Aplicación plenamente funcional (login, pacientes, agenda, historia,
+      medicación, documentos, CDA, RBAC, auditoría, backup)
+- [ ] Piloto completado con datos reales

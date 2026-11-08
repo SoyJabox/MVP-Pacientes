@@ -90,6 +90,31 @@ citasRouter.post("/citas", async (c) => {
   return c.json(nueva, 201);
 });
 
+const estadoSchema = z.object({ estado: z.enum(["agendada", "atendida", "cancelada"]) });
+
+// Cambiar estado: agendada -> atendida (el paciente vino) o cancelada.
+// "atendida" es terminal: corregir una consulta se hace en la historia, no acá.
+citasRouter.patch("/citas/:id{\\d+}", async (c) => {
+  const id = Number(c.req.param("id"));
+  const parsed = estadoSchema.safeParse(await c.req.json().catch(() => null));
+  if (!parsed.success) return c.json({ error: "Estado inválido" }, 400);
+
+  const [actual] = await db.select({ estado: citas.estado }).from(citas).where(eq(citas.id, id));
+  if (!actual) return c.json({ error: "Cita no encontrada" }, 404);
+  if (actual.estado === "atendida" && parsed.data.estado !== "atendida") {
+    return c.json({ error: "Una cita atendida no se puede reabrir" }, 409);
+  }
+
+  const [fila] = await db
+    .update(citas)
+    .set({ estado: parsed.data.estado })
+    .where(eq(citas.id, id))
+    .returning({ id: citas.id, estado: citas.estado });
+
+  c.set("entidadId", id);
+  return c.json(fila);
+});
+
 // Cancelar cita: cambia estado a "cancelada" (no se borra).
 citasRouter.delete("/citas/:id{\\d+}", async (c) => {
   const id = Number(c.req.param("id"));

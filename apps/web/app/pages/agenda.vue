@@ -95,6 +95,16 @@ async function crearCita() {
   }
 }
 
+async function marcarAtendida(id: number) {
+  error.value = "";
+  try {
+    await $fetch(`/api/citas/${id}`, { method: "PATCH", body: { estado: "atendida" } });
+    await cargarCitas();
+  } catch {
+    error.value = "No se pudo marcar la cita como atendida.";
+  }
+}
+
 async function cancelarCita(id: number) {
   error.value = "";
   try {
@@ -117,7 +127,7 @@ const fechaLegible = computed(() =>
   }),
 );
 
-const agendadas = computed(() => citas.value.filter((c) => c.estado !== "cancelada"));
+const agendadas = computed(() => citas.value.filter((c) => c.estado === "agendada"));
 </script>
 
 <template>
@@ -176,7 +186,10 @@ const agendadas = computed(() => citas.value.filter((c) => c.estado !== "cancela
               </td>
               <td class="num">{{ c.pacienteCedula }}</td>
               <td>
-                <span class="etiqueta" :class="c.estado === 'cancelada' ? 'etiqueta--gris' : 'etiqueta--ok'">
+                <span
+                  class="etiqueta"
+                  :class="c.estado === 'agendada' ? '' : c.estado === 'atendida' ? 'etiqueta--ok' : 'etiqueta--gris'"
+                >
                   {{ c.estado }}
                 </span>
               </td>
@@ -186,7 +199,10 @@ const agendadas = computed(() => citas.value.filter((c) => c.estado !== "cancela
                     <button class="peligro" @click="cancelarCita(c.id)">Confirmar</button>
                     <button @click="confirmando = null">No</button>
                   </template>
-                  <button v-else @click="confirmando = c.id">Cancelar</button>
+                  <template v-else>
+                    <button class="primario" @click="marcarAtendida(c.id)">Atendida</button>
+                    <button @click="confirmando = c.id">Cancelar</button>
+                  </template>
                 </template>
               </td>
             </tr>
