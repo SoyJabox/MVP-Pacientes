@@ -15,14 +15,15 @@
 - [x] Task 5: POST `/auth/login` con JWT + hash nativo de Bun
 - [x] Task 6: Middleware autenticación JWT
 - [x] Task 7: Middleware RBAC (admin, recepcion, profesional)
-- [ ] Task 8: Nuxt login + composable sesión
-- [ ] Task 9: Nuxt middleware protección de rutas
+- [x] Task 8: Nuxt login + composable sesión (proxy server-side con cookie HttpOnly)
+- [x] Task 9: Nuxt middleware protección de rutas
 
 ### Checkpoint: Auth
 - [x] Login curl → JWT
-- [x] Nuxt login → cookie + redirect (pendiente Task 8)
+- [x] Nuxt login → cookie + redirect (verificado en navegador con agent-browser)
 - [x] Rutas protegidas bloquean sin token
-- [x] RBAC: middleware bloqueado con 403 (verificación end-to-end en Fase 2+)
+- [x] Cookie HttpOnly + SameSite=Strict (verificado con curl)
+- [x] Proxy /api sin cookie → 401
 
 ## Phase 2: Pacientes + Auditoría
 - [ ] Task 10: CRUD pacientes en Hono
