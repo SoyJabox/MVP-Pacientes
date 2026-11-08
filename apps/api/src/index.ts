@@ -1,4 +1,7 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { secureHeaders } from "hono/secure-headers";
+import { rateLimiter } from "hono-rate-limiter";
 import { eq } from "drizzle-orm";
 import { db } from "./db/client";
 import { usuarios } from "./db/schema";
@@ -9,6 +12,50 @@ import { consultasRouter } from "./consultas";
 import { documentosRouter } from "./documentos";
 
 const app = new Hono<EnvAuth>();
+
+// Security headers en todas las respuestas.
+app.use(
+  "*",
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      fontSrc: ["'self'"],
+      connectSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  }),
+);
+
+// CORS: solo el frontend de Nuxt puede llamar a la API.
+app.use(
+  "*",
+  cors({
+    origin: [process.env.NUXT_URL || "http://localhost:3001"],
+    allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
+    maxAge: 86400,
+  }),
+);
+
+// Rate limiting: 100 requests por minuto por IP. Previene brute force y DoS.
+app.use(
+  "*",
+  rateLimiter({
+    windowMs: 60 * 1000,
+    limit: 100,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (c) => c.req.header("x-forwarded-for") || c.req.header("host") || "unknown",
+    handler: (c) => c.json({ error: "Demasiadas requests. Intentá de nuevo en un minuto." }, 429),
+  }),
+);
 
 // Salud
 app.get("/", (c) => c.json({ ok: true, servicio: "gestor-pacientes-api" }));
