@@ -34,6 +34,7 @@ const consultas = ref<Consulta[]>([]);
 const documentos = ref<Documento[]>([]);
 const cargando = ref(true);
 const error = ref("");
+const noEncontrado = ref(false);
 
 const nueva = ref({ motivo: "", evolucion: "", diagnosticoCie10: "" });
 const guardando = ref(false);
@@ -60,9 +61,13 @@ async function cargarTodo() {
 
 onMounted(async () => {
   // El paciente sí lo puede ver recepción: son datos administrativos.
-  $fetch<typeof paciente.value>(`/api/pacientes/${id}`)
-    .then((p) => (paciente.value = p))
-    .catch(() => {});
+  try {
+    paciente.value = await $fetch<typeof paciente.value>(`/api/pacientes/${id}`);
+  } catch {
+    noEncontrado.value = true;
+    cargando.value = false;
+    return;
+  }
   await cargarTodo();
 });
 
@@ -148,8 +153,14 @@ const edad = computed(() => {
 
     <p v-if="error" class="mensaje-error" role="alert">{{ error }}</p>
 
+    <div v-if="noEncontrado" class="tarjeta no-encontrado">
+      <h2>Paciente no encontrado</h2>
+      <p class="historia__ayuda">El paciente no existe o fue dado de baja.</p>
+      <NuxtLink to="/pacientes" class="boton">Volver a la lista</NuxtLink>
+    </div>
+
     <!-- Recepción: solo datos administrativos, sin contenido clínico. -->
-    <p v-if="!esClinico" class="mensaje-vacio">
+    <p v-else-if="!esClinico" class="mensaje-vacio">
       Tu rol no tiene acceso a la historia clínica. Podés editar los datos administrativos del paciente.
     </p>
 
@@ -327,6 +338,13 @@ const edad = computed(() => {
   position: sticky;
   top: 4.5rem;
   min-width: 0;
+}
+
+.no-encontrado {
+  display: grid;
+  gap: 0.6rem;
+  justify-items: start;
+  max-width: 420px;
 }
 
 .historia__ayuda {
