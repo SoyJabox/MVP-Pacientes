@@ -129,6 +129,7 @@ consultasRouter.get("/consultas/:id{\\d+}/cda", async (c) => {
   });
 
   c.set("entidadId", id);
+  c.set("accion", "exportar");
   return c.body(xml, 200, {
     "Content-Type": "application/xml; charset=utf-8",
     "Content-Disposition": `inline; filename="cda-consulta-${id}.xml"`,

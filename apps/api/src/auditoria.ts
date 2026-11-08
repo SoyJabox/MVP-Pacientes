@@ -24,7 +24,8 @@ export const auditar = (entidad: string) =>
     if (!usuario) return;
 
     const metodo = c.req.method;
-    const accion: Accion = ACCION_POR_METODO[metodo] ?? "ver";
+    // La acción explícita del handler gana sobre la deducida del método.
+    const accion: Accion = c.get("accion") ?? ACCION_POR_METODO[metodo] ?? "ver";
     // GET con id en el path es "ver" un recurso puntual.
     const idUrl = c.req.path.split("/").pop();
     const id = Number(idUrl);

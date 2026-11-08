@@ -12,8 +12,16 @@ export interface PayloadJwt {
 
 export interface UsuarioAuth extends PayloadJwt {}
 
-// Variable de contexto que el middleware setea y los handlers leen.
-export type EnvAuth = { Variables: { usuario: UsuarioAuth } };
+// Variables de contexto que los middlewares setean y los handlers leen.
+export type EnvAuth = {
+  Variables: {
+    usuario: UsuarioAuth;
+    entidadId?: number;
+    // El handler puede precisar la acción cuando el método HTTP no alcanza
+    // (por ejemplo una exportación CDA, que viaja como GET).
+    accion?: "ver" | "listar" | "crear" | "editar" | "eliminar" | "exportar";
+  };
+};
 
 export async function emitirJwt(usuarioId: number, rol: Rol): Promise<string> {
   const exp = Math.floor(Date.now() / 1000) + 60 * 60 * 8; // 8 horas

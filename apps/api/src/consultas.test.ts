@@ -1,7 +1,7 @@
 import { describe, test, expect, beforeAll } from "bun:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db/client";
-import { usuarios, pacientes } from "./db/schema";
+import { usuarios, pacientes, auditoria } from "./db/schema";
 import { emitirJwt } from "./auth";
 import { app } from "./index";
 
@@ -114,5 +114,31 @@ describe("Consultas y medicación", () => {
       body: JSON.stringify({ pacienteId, motivo: "intento" }),
     });
     expect(res.status).toBe(403);
+  });
+});
+
+describe("Auditoría de exportación", () => {
+  test("generar CDA deja accion 'exportar' en auditoría", async () => {
+    const h = await headers(profesionalId, "profesional");
+    // Crear una consulta propia para no depender de otros tests.
+    const creada = await app.request("/consultas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, motivo: "Para exportar" }),
+    });
+    const { id: consultaId } = await creada.json<{ id: number }>();
+    await app.request(`/consultas/${consultaId}/cda`, { headers: h });
+
+    const [reg] = await db
+      .select()
+      .from(auditoria)
+      .where(
+        and(
+          eq(auditoria.entidadAfectada, "consultas"),
+          eq(auditoria.accion, "exportar"),
+          eq(auditoria.entidadId, consultaId),
+        ),
+      );
+    expect(reg).toBeTruthy();
   });
 });
