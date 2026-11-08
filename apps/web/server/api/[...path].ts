@@ -10,20 +10,28 @@ export default defineEventHandler(async (event) => {
   const method = event.method;
 
   const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
-  let body: string | undefined;
+  let body: Uint8Array | undefined;
   if (BODY_METHODS.has(method)) {
-    const raw = await readRawBody(event).catch(() => undefined);
-    if (typeof raw === "string" && raw.length > 0) {
+    // Bytes crudos: multipart con PDFs/imágenes no sobrevive a una conversión a string.
+    const raw = await readRawBody(event, false).catch(() => undefined);
+    if (raw && raw.length > 0) {
       headers["Content-Type"] = event.headers.get("content-type") ?? "application/json";
       body = raw;
     }
   }
 
   const res = await fetch(`${apiBase()}${path}`, { method, headers, body });
-  const text = await res.text();
+  const tipo = res.headers.get("content-type") ?? "application/json";
   setResponseStatus(event, res.status);
-  if (text) {
-    event.node.res.setHeader("content-type", res.headers.get("content-type") ?? "application/json");
-  }
-  return text;
+  event.node.res.setHeader("content-type", tipo);
+
+  const disposicion = res.headers.get("content-disposition");
+  if (disposicion) event.node.res.setHeader("content-disposition", disposicion);
+
+  // JSON y XML viajan como texto (legible y con charset correcto);
+  // cualquier otro tipo (PDF, imágenes) se devuelve byte a byte.
+  const esTexto = tipo.includes("json") || tipo.includes("xml") || tipo.startsWith("text/");
+  if (esTexto) return await res.text();
+
+  return new Uint8Array(await res.arrayBuffer());
 });

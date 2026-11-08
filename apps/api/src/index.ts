@@ -6,6 +6,7 @@ import { emitirJwt, requiereAuth, type EnvAuth } from "./auth";
 import { pacientesRouter } from "./pacientes";
 import { citasRouter } from "./citas";
 import { consultasRouter } from "./consultas";
+import { documentosRouter } from "./documentos";
 
 const app = new Hono<EnvAuth>();
 
@@ -40,6 +41,7 @@ app.use("*", requiereAuth);
 app.route("/", pacientesRouter);
 app.route("/", citasRouter);
 app.route("/", consultasRouter);
+app.route("/", documentosRouter);
 
 // Quién soy: Nuxt lo usa para restaurar la sesión al recargar.
 app.get("/me", (c) => {

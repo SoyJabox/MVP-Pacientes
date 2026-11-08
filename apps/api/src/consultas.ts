@@ -5,6 +5,7 @@ import { db } from "./db/client";
 import { consultas, medicacion, pacientes, usuarios } from "./db/schema";
 import { requiereRol, type EnvAuth } from "./auth";
 import { auditar } from "./auditoria";
+import { generarCdaNivel1 } from "./cda";
 
 const consultaSchema = z.object({
   pacienteId: z.number().int().positive(),
@@ -79,6 +80,59 @@ consultasRouter.get("/consultas/paciente/:pacienteId{\\d+}", async (c) => {
   );
 
   return c.json(conMedicacion);
+});
+
+// CDA R2 nivel 1 de una consulta (CMD mínimo HCEN).
+consultasRouter.get("/consultas/:id{\\d+}/cda", async (c) => {
+  const id = Number(c.req.param("id"));
+
+  const [fila] = await db
+    .select({
+      id: consultas.id,
+      fecha: consultas.fecha,
+      motivo: consultas.motivo,
+      evolucion: consultas.evolucion,
+      diagnosticoCie10: consultas.diagnosticoCie10,
+      pacienteNombre: pacientes.nombre,
+      pacienteCedula: pacientes.cedula,
+      pacienteNacimiento: pacientes.fechaNacimiento,
+      profesionalId: usuarios.id,
+      profesionalEmail: usuarios.email,
+    })
+    .from(consultas)
+    .innerJoin(pacientes, eq(consultas.pacienteId, pacientes.id))
+    .innerJoin(usuarios, eq(consultas.profesionalId, usuarios.id))
+    .where(eq(consultas.id, id));
+
+  if (!fila) return c.json({ error: "Consulta no encontrada" }, 404);
+
+  const meds = await db
+    .select({ medicamento: medicacion.medicamento, dosis: medicacion.dosis, duracion: medicacion.duracion })
+    .from(medicacion)
+    .where(eq(medicacion.consultaId, id));
+
+  const xml = generarCdaNivel1({
+    paciente: {
+      nombre: fila.pacienteNombre,
+      cedula: fila.pacienteCedula,
+      fechaNacimiento: fila.pacienteNacimiento,
+    },
+    profesional: { nombre: fila.profesionalEmail, id: fila.profesionalId },
+    consulta: {
+      id: fila.id,
+      fecha: fila.fecha,
+      motivo: fila.motivo,
+      evolucion: fila.evolucion,
+      diagnosticoCie10: fila.diagnosticoCie10,
+    },
+    medicacion: meds,
+  });
+
+  c.set("entidadId", id);
+  return c.body(xml, 200, {
+    "Content-Type": "application/xml; charset=utf-8",
+    "Content-Disposition": `inline; filename="cda-consulta-${id}.xml"`,
+  });
 });
 
 consultasRouter.post("/consultas", async (c) => {

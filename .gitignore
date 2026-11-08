@@ -22,3 +22,6 @@ backups/
 .DS_Store
 *.swp
 .idea/
+
+# Documentos clínicos subidos (datos de salud, nunca al repo)
+apps/api/data/

@@ -26,6 +26,16 @@ const consultas = ref<Consulta[]>([]);
 const cargando = ref(true);
 const error = ref("");
 
+// Documentos del paciente.
+interface Documento {
+  id: number;
+  nombreArchivo: string;
+  fechaSubida: string;
+}
+const documentos = ref<Documento[]>([]);
+const subiendo = ref(false);
+const inputArchivo = ref<HTMLInputElement | null>(null);
+
 // Formulario de nueva consulta (solo roles clínicos).
 const nueva = ref({ motivo: "", evolucion: "", diagnosticoCie10: "" });
 const guardando = ref(false);
@@ -39,12 +49,35 @@ onMounted(async () => {
   }
   try {
     consultas.value = await $fetch<Consulta[]>(`/api/consultas/paciente/${id}`);
+    documentos.value = await $fetch<Documento[]>(`/api/documentos/paciente/${id}`);
   } catch {
     error.value = "No se pudo cargar la historia clínica.";
   } finally {
     cargando.value = false;
   }
 });
+
+async function subirDocumento(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const archivo = input.files?.[0];
+  if (!archivo) return;
+
+  subiendo.value = true;
+  error.value = "";
+  const body = new FormData();
+  body.append("pacienteId", String(id));
+  body.append("archivo", archivo);
+
+  try {
+    await $fetch("/api/documentos", { method: "POST", body });
+    documentos.value = await $fetch<Documento[]>(`/api/documentos/paciente/${id}`);
+    input.value = "";
+  } catch (err: unknown) {
+    error.value = (err as { data?: { error?: string } }).data?.error || "No se pudo subir el documento.";
+  } finally {
+    subiendo.value = false;
+  }
+}
 
 async function guardarConsulta() {
   guardando.value = true;
@@ -105,6 +138,27 @@ async function guardarMedicacion(consultaId: number) {
           </button>
         </form>
 
+        <section class="documentos">
+          <h2>Documentos ({{ documentos.length }})</h2>
+          <input
+            ref="inputArchivo"
+            type="file"
+            accept="application/pdf,image/png,image/jpeg"
+            :disabled="subiendo"
+            aria-label="Subir documento"
+            @change="subirDocumento"
+          />
+          <p v-if="subiendo">Subiendo…</p>
+          <ul v-if="documentos.length">
+            <li v-for="d in documentos" :key="d.id">
+              <a :href="`/api/documentos/${d.id}/archivo`" target="_blank" rel="noopener">
+                {{ d.nombreArchivo }}
+              </a>
+              <span class="fecha-doc">{{ new Date(d.fechaSubida).toLocaleDateString("es-UY") }}</span>
+            </li>
+          </ul>
+        </section>
+
         <h2>Consultas ({{ consultas.length }})</h2>
         <p v-if="!cargando && consultas.length === 0">Sin consultas registradas.</p>
 
@@ -127,14 +181,19 @@ async function guardarMedicacion(consultaId: number) {
             </ul>
           </div>
 
-          <button
-            v-if="expandeda !== c.id"
-            class="boton"
-            @click="expandeda = c.id; nuevaMed = { medicamento: '', dosis: '', duracion: '' }"
-          >
-            + Prescribir medicación
-          </button>
-          <form v-else class="nueva-med" @submit.prevent="guardarMedicacion(c.id)">
+          <div class="acciones-consulta">
+            <button
+              v-if="expandeda !== c.id"
+              class="boton"
+              @click="expandeda = c.id; nuevaMed = { medicamento: '', dosis: '', duracion: '' }"
+            >
+              + Prescribir medicación
+            </button>
+            <a :href="`/api/consultas/${c.id}/cda`" target="_blank" rel="noopener" class="boton">
+              CDA (XML)
+            </a>
+          </div>
+          <form v-if="expandeda === c.id" class="nueva-med" @submit.prevent="guardarMedicacion(c.id)">
             <input v-model="nuevaMed.medicamento" placeholder="Medicamento" required />
             <input v-model="nuevaMed.dosis" placeholder="Dosis (ej: 1 cápsula cada 8h)" required />
             <input v-model="nuevaMed.duracion" placeholder="Duración (ej: 7 días)" />
@@ -195,4 +254,10 @@ button:disabled { opacity: 0.6; cursor: wait; }
 .fila { display: flex; gap: 0.5rem; }
 .error { color: #b42318; }
 .aviso { color: #66727f; }
+.documentos { background: #fff; border-radius: 10px; padding: 1.25rem; }
+.documentos h2 { margin-top: 0; }
+.documentos ul { margin: 0.75rem 0 0; padding-left: 1.2rem; font-size: 0.93rem; }
+.fecha-doc { color: #66727f; font-size: 0.85rem; margin-left: 0.75rem; }
+.acciones-consulta { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.acciones-consulta a.boton { padding: 0.5rem 1.1rem; display: inline-block; }
 </style>
