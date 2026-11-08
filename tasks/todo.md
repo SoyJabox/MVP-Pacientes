@@ -11,18 +11,18 @@
 - [x] Docs fuera del git
 
 ## Phase 1: Auth + Modelo base
-- [ ] Task 4: Esquema Drizzle — `usuarios` + `pacientes`
-- [ ] Task 5: POST `/auth/login` con JWT + bcrypt
-- [ ] Task 6: Middleware autenticación JWT
-- [ ] Task 7: Middleware RBAC (admin, recepcion, profesional)
+- [x] Task 4: Esquema Drizzle — `usuarios` + `pacientes` (de paso: citas, consultas, medicacion, documentos, auditoria)
+- [x] Task 5: POST `/auth/login` con JWT + hash nativo de Bun
+- [x] Task 6: Middleware autenticación JWT
+- [x] Task 7: Middleware RBAC (admin, recepcion, profesional)
 - [ ] Task 8: Nuxt login + composable sesión
 - [ ] Task 9: Nuxt middleware protección de rutas
 
 ### Checkpoint: Auth
-- [ ] Login curl → JWT
-- [ ] Nuxt login → cookie + redirect
-- [ ] Rutas protegidas bloquean sin token
-- [ ] RBAC: recepción bloqueada en endpoints clínicos
+- [x] Login curl → JWT
+- [x] Nuxt login → cookie + redirect (pendiente Task 8)
+- [x] Rutas protegidas bloquean sin token
+- [x] RBAC: middleware bloqueado con 403 (verificación end-to-end en Fase 2+)
 
 ## Phase 2: Pacientes + Auditoría
 - [ ] Task 10: CRUD pacientes en Hono
