@@ -18,6 +18,23 @@ const DIR_DOCS = process.env.DOCS_DIR ?? join(process.cwd(), "data", "documentos
 const MIMES_PERMITIDOS = new Set(["application/pdf", "image/png", "image/jpeg"]);
 const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
 
+// Firmas mágicas (magic bytes) para validar el contenido real del archivo.
+const FIRMAS: Record<string, Uint8Array> = {
+  "application/pdf": new Uint8Array([0x25, 0x50, 0x44, 0x46]), // %PDF
+  "image/png": new Uint8Array([0x89, 0x50, 0x4e, 0x47]), // .PNG
+  "image/jpeg": new Uint8Array([0xff, 0xd8, 0xff]), // ÿØÿ
+};
+
+function validarFirma(tipo: string, bytes: Uint8Array): boolean {
+  const firma = FIRMAS[tipo];
+  if (!firma) return false;
+  if (bytes.length < firma.length) return false;
+  for (let i = 0; i < firma.length; i++) {
+    if (bytes[i] !== firma[i]) return false;
+  }
+  return true;
+}
+
 export const documentosRouter = new Hono<EnvAuth>();
 
 documentosRouter.use("/documentos", soloClinicos);
@@ -59,6 +76,12 @@ documentosRouter.post("/documentos", async (c) => {
     return c.json({ error: "El archivo supera los 20 MB." }, 400);
   }
 
+  // Validar firma mágica: el MIME declarado debe coincidir con el contenido real.
+  const bytes = new Uint8Array(await archivo.arrayBuffer());
+  if (!validarFirma(archivo.type, bytes)) {
+    return c.json({ error: "El contenido del archivo no coincide con el formato declarado." }, 400);
+  }
+
   const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(eq(pacientes.id, pacienteId));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
 
@@ -69,7 +92,6 @@ documentosRouter.post("/documentos", async (c) => {
   const nombreEnDisco = `${randomUUID()}${ext}`;
   const ruta = join(DIR_DOCS, nombreEnDisco);
 
-  const bytes = new Uint8Array(await archivo.arrayBuffer());
   await writeFile(ruta, bytes, { mode: 0o600 });
 
   const [nuevo] = await db
