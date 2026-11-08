@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import DOMPurify from "isomorphic-dompurify";
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "./db/client";
 import { consultas, medicacion, pacientes, usuarios } from "./db/schema";
@@ -9,8 +10,18 @@ import { generarCdaNivel1 } from "./cda";
 
 const consultaSchema = z.object({
   pacienteId: z.number().int().positive(),
-  motivo: z.string().trim().min(3).max(500),
-  evolucion: z.string().trim().max(5000).default(""),
+  motivo: z
+    .string()
+    .trim()
+    .min(3)
+    .max(500)
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
+  evolucion: z
+    .string()
+    .trim()
+    .max(5000)
+    .default("")
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
   diagnosticoCie10: z
     .string()
     .trim()

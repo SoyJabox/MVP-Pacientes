@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { z } from "zod";
+import DOMPurify from "isomorphic-dompurify";
 import { and, eq, between, ilike, or } from "drizzle-orm";
 import { db } from "./db/client";
 import { pacientes, usuarios } from "./db/schema";
@@ -8,9 +9,19 @@ import { auditar } from "./auditoria";
 
 const pacienteSchema = z.object({
   cedula: z.string().trim().min(7).max(8).regex(/^\d{7,8}$/, "Cédula uruguaya: 7 u 8 dígitos"),
-  nombre: z.string().trim().min(2).max(120),
+  nombre: z
+    .string()
+    .trim()
+    .min(2)
+    .max(120)
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
   fechaNacimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha ISO yyyy-mm-dd"),
-  contacto: z.string().trim().max(200).default(""),
+  contacto: z
+    .string()
+    .trim()
+    .max(200)
+    .default("")
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
   consentimientoFirmado: z.boolean().default(false),
 });
 
