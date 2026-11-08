@@ -47,17 +47,17 @@
 - [x] Choque de horario → 409
 - [x] 5 tests nuevos (18 en total, todos pasando)
 
-## Phase 4: Consultas + Medicación
-- [ ] Task 17: Esquema Drizzle — `consultas` + `medicacion`
-- [ ] Task 18: API registrar consulta (CIE-10)
-- [ ] Task 19: API prescripción medicación
-- [ ] Task 20: Nuxt formulario consulta
-- [ ] Task 21: Nuxt vista historia clínica
+## Phase 4: Consultas + Medicación ✅
+- [x] Task 17: Esquema Drizzle — `consultas` + `medicacion` (ya existía)
+- [x] Task 18: API registrar consulta (CIE-10 validado con Zod)
+- [x] Task 19: API prescripción medicación
+- [x] Task 20: Nuxt formulario consulta
+- [x] Task 21: Nuxt vista historia clínica
 
-### Checkpoint: Consultas
-- [ ] Consulta con diagnóstico CIE-10
-- [ ] Medicación asociada a consulta
-- [ ] Recepción NO ve datos clínicos
+### Checkpoint: Consultas ✅
+- [x] Consulta con diagnóstico CIE-10
+- [x] Medicación asociada a consulta
+- [x] Recepción NO ve datos clínicos (403 en API + mensaje en UI, verificado en navegador)
 
 ## Phase 5: Documentos + CDA
 - [ ] Task 22: Esquema Drizzle — `documentos`

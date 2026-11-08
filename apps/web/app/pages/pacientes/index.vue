@@ -63,11 +63,11 @@ onMounted(buscar);
         </thead>
         <tbody>
           <tr v-for="p in pacientes" :key="p.id">
-            <td>{{ p.nombre }}</td>
+            <td><NuxtLink :to="`/pacientes/${p.id}`" class="enlace">{{ p.nombre }}</NuxtLink></td>
             <td>{{ p.cedula }}</td>
             <td>{{ p.contacto }}</td>
             <td>{{ p.consentimientoFirmado ? "Firmado" : "Pendiente" }}</td>
-            <td><NuxtLink :to="`/pacientes/${p.id}`" class="boton">Editar</NuxtLink></td>
+            <td><NuxtLink :to="`/pacientes/${p.id}/editar`" class="boton">Editar</NuxtLink></td>
           </tr>
         </tbody>
       </table>
@@ -100,5 +100,7 @@ th { background: #f7f9fb; font-weight: 600; }
 .boton.primario { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
 .boton.primario:hover { background: #1d4fc4; }
 .error { color: #b42318; }
+.enlace { color: #2563eb; text-decoration: none; }
+.enlace:hover { text-decoration: underline; }
 .visualmente-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 </style>
