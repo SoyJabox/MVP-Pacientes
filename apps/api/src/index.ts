@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { db } from "./db/client";
 import { usuarios } from "./db/schema";
 import { emitirJwt, requiereAuth, type EnvAuth } from "./auth";
+import { pacientesRouter } from "./pacientes";
 
 const app = new Hono<EnvAuth>();
 
@@ -33,6 +34,8 @@ app.post("/auth/login", async (c) => {
 
 // Todo lo demás requiere sesión.
 app.use("*", requiereAuth);
+
+app.route("/", pacientesRouter);
 
 // Quién soy: Nuxt lo usa para restaurar la sesión al recargar.
 app.get("/me", (c) => {

@@ -22,6 +22,8 @@ export const pacientes = pgTable(
     contacto: text("contacto").notNull().default(""),
     fechaAlta: timestamp("fecha_alta", { withTimezone: true }).notNull().defaultNow(),
     consentimientoFirmado: boolean("consentimiento_firmado").notNull().default(false),
+    // Soft delete: un paciente con historia clínica nunca se borra de verdad.
+    activo: boolean("activo").notNull().default(true),
   },
   (t) => [
     uniqueIndex("pacientes_cedula_idx").on(t.cedula),

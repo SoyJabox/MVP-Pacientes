@@ -26,15 +26,15 @@
 - [x] Proxy /api sin cookie → 401
 
 ## Phase 2: Pacientes + Auditoría
-- [ ] Task 10: CRUD pacientes en Hono
-- [ ] Task 11: Middleware auditoría
-- [ ] Task 12: Nuxt lista de pacientes + búsqueda
-- [ ] Task 13: Nuxt formulario alta/edición paciente
+- [x] Task 10: CRUD pacientes en Hono (validación Zod, búsqueda, soft delete con `activo`)
+- [x] Task 11: Middleware auditoría (crear/editar/eliminar/ver/listar)
+- [x] Task 12: Nuxt lista de pacientes + búsqueda
+- [x] Task 13: Nuxt formulario alta/edición paciente
 
 ### Checkpoint: Pacientes
-- [ ] CRUD funciona desde UI
-- [ ] Auditoría registra cada acción
-- [ ] Búsqueda por cedula/nombre
+- [x] CRUD funciona desde UI (verificado con agent-browser)
+- [x] Auditoría registra cada acción (crear, editar, listar verificados en BD)
+- [x] Búsqueda por cedula/nombre
 
 ## Phase 3: Agenda
 - [ ] Task 14: Esquema Drizzle — `citas`

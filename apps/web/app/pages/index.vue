@@ -18,7 +18,10 @@ async function salir() {
       </div>
     </header>
     <section class="contenido">
-      <p>Sesión iniciada. Las pantallas de pacientes y agenda llegan en las próximas fases.</p>
+      <nav class="atajos">
+        <NuxtLink to="/pacientes" class="atajo">Pacientes</NuxtLink>
+      </nav>
+      <p>Sesión iniciada. La agenda y consultas llegan en las próximas fases.</p>
     </section>
   </main>
 </template>
@@ -49,4 +52,10 @@ button {
 }
 button:hover { background: #f0f2f5; }
 .contenido { padding: 1.5rem; }
+.atajos { display: flex; gap: 0.75rem; margin-bottom: 1rem; }
+.atajo {
+  padding: 0.6rem 1.2rem; border-radius: 8px; background: #fff;
+  border: 1px solid #cdd4db; text-decoration: none; color: #1c2430; font-weight: 600;
+}
+.atajo:hover { background: #f0f2f5; }
 </style>
