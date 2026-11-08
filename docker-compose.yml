@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: gestor-pacientes-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gestor
+      POSTGRES_PASSWORD: gestor_dev
+      POSTGRES_DB: gestor_pacientes
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

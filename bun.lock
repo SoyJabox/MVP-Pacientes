@@ -1,0 +1,23 @@
+{
+  "lockfileVersion": 2,
+  "configVersion": 1,
+  "workspaces": {
+    "": {
+      "name": "gestor-pacientes",
+    },
+    "apps/api": {
+      "name": "@gestor/api",
+      "dependencies": {
+        "@gestor/shared": "workspace:*",
+      },
+    },
+    "packages/shared": {
+      "name": "@gestor/shared",
+    },
+  },
+  "packages": {
+    "@gestor/api": ["@gestor/api@workspace:apps/api"],
+
+    "@gestor/shared": ["@gestor/shared@workspace:packages/shared"],
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "@gestor/shared",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "test": "bun test"
+  }
+}

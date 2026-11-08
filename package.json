@@ -1,0 +1,12 @@
+{
+  "name": "gestor-pacientes",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:api": "bun --filter './apps/api' dev",
+    "dev:web": "bun --filter './apps/web' dev"
+  }
+}
