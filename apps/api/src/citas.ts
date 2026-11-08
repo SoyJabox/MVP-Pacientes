@@ -4,7 +4,11 @@ import { and, eq, between } from "drizzle-orm";
 import { db } from "./db/client";
 import { citas, pacientes, usuarios } from "./db/schema";
 import type { EnvAuth } from "./auth";
+import { requiereRol } from "./auth";
 import { auditar } from "./auditoria";
+
+// RBAC: recepción NO accede a datos clínicos. Solo admin y profesional.
+const soloClinicos = requiereRol("admin", "profesional");
 
 const crearCitaSchema = z.object({
   pacienteId: z.number().int().positive(),
@@ -94,7 +98,8 @@ const estadoSchema = z.object({ estado: z.enum(["agendada", "atendida", "cancela
 
 // Cambiar estado: agendada -> atendida (el paciente vino) o cancelada.
 // "atendida" es terminal: corregir una consulta se hace en la historia, no acá.
-citasRouter.patch("/citas/:id{\\d+}", async (c) => {
+// RBAC: solo admin y profesional pueden cambiar el estado.
+citasRouter.patch("/citas/:id{\\d+}", soloClinicos, async (c) => {
   const id = Number(c.req.param("id"));
   const parsed = estadoSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Estado inválido" }, 400);

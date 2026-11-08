@@ -65,6 +65,7 @@ const casos: Caso[] = [
   { nombre: "generar CDA", metodo: "GET", ruta: () => `/consultas/${consultaId}/cda`, permitido: ["admin", "profesional"] },
   { nombre: "listar documentos", metodo: "GET", ruta: () => `/documentos/paciente/${pacienteId}`, permitido: ["admin", "profesional"] },
   { nombre: "descargar documento", metodo: "GET", ruta: () => "/documentos/1/archivo", permitido: ["admin", "profesional"] },
+  { nombre: "cambiar estado de cita", metodo: "PATCH", ruta: () => `/citas/1`, cuerpo: { estado: "atendida" }, permitido: ["admin", "profesional"] },
 ];
 
 describe("Matriz RBAC: rol × endpoint", () => {
