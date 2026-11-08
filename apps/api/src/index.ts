@@ -44,9 +44,17 @@ app.route("/", consultasRouter);
 app.route("/", documentosRouter);
 
 // Quién soy: Nuxt lo usa para restaurar la sesión al recargar.
-app.get("/me", (c) => {
+app.get("/me", async (c) => {
   const u = c.get("usuario");
-  return c.json({ id: u.sub, rol: u.rol });
+  const [fila] = await db
+    .select({ id: usuarios.id, email: usuarios.email, rol: usuarios.rol, activo: usuarios.activo })
+    .from(usuarios)
+    .where(eq(usuarios.id, u.sub));
+
+  // Si la cuenta se desactivó después de emitir el token, la sesión muere acá.
+  if (!fila || !fila.activo) return c.json({ error: "Sesión no válida" }, 401);
+
+  return c.json({ id: fila.id, email: fila.email, rol: fila.rol });
 });
 
 export { app };

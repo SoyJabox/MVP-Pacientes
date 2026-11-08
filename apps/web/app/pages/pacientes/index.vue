@@ -3,11 +3,12 @@ import type { Paciente } from "@gestor/shared";
 
 const q = ref("");
 const pacientes = ref<Paciente[]>([]);
-const cargando = ref(false);
+const cargando = ref(true);
 const error = ref("");
+const busco = ref(false);
 
 async function buscar() {
-  cargando.value = true;
+  busco.value = true;
   error.value = "";
   try {
     pacientes.value = await $fetch<Paciente[]>("/api/pacientes", {
@@ -17,10 +18,11 @@ async function buscar() {
     error.value = "No se pudo cargar la lista de pacientes.";
   } finally {
     cargando.value = false;
+    busco.value = false;
   }
 }
 
-// Búsqueda con retardo: no llamamos a la API en cada tecla.
+// Búsqueda con retardo: no golpear la API en cada tecla.
 let timer: ReturnType<typeof setTimeout> | undefined;
 watch(q, () => {
   clearTimeout(timer);
@@ -31,76 +33,143 @@ onMounted(buscar);
 </script>
 
 <template>
-  <main class="panel">
-    <header>
-      <h1>Pacientes</h1>
-      <div class="acciones">
-        <NuxtLink to="/pacientes/nuevo" class="boton primario">+ Nuevo paciente</NuxtLink>
+  <div class="lista">
+    <header class="lista__cabecera">
+      <div>
+        <h1>Pacientes</h1>
+        <p class="lista__conteo num">
+          {{ cargando ? "Cargando…" : `${pacientes.length} ${pacientes.length === 1 ? "paciente" : "pacientes"}` }}
+        </p>
       </div>
+      <NuxtLink to="/pacientes/nuevo" class="boton primario">+ Nuevo paciente</NuxtLink>
     </header>
 
-    <section class="contenido">
+    <div class="lista__filtro">
       <input
         v-model="q"
         type="search"
-        class="busqueda"
         placeholder="Buscar por nombre o cédula…"
         aria-label="Buscar paciente"
       />
+      <span v-if="busco" class="lista__buscando" aria-live="polite">Buscando…</span>
+    </div>
 
-      <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <p v-else-if="cargando">Cargando…</p>
+    <p v-if="error" class="mensaje-error" role="alert">{{ error }}</p>
 
-      <table v-else-if="pacientes.length">
+    <div v-else-if="!cargando && pacientes.length" class="tabla-envoltura">
+      <table>
         <thead>
           <tr>
             <th scope="col">Nombre</th>
             <th scope="col">Cédula</th>
-            <th scope="col">Contacto</th>
-            <th scope="col">Consentimiento</th>
+            <th scope="col" class="col-sec">Contacto</th>
+            <th scope="col" class="col-sec">Consentimiento</th>
             <th scope="col"><span class="visualmente-oculto">Acciones</span></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="p in pacientes" :key="p.id">
-            <td><NuxtLink :to="`/pacientes/${p.id}`" class="enlace">{{ p.nombre }}</NuxtLink></td>
-            <td>{{ p.cedula }}</td>
-            <td>{{ p.contacto }}</td>
-            <td>{{ p.consentimientoFirmado ? "Firmado" : "Pendiente" }}</td>
-            <td><NuxtLink :to="`/pacientes/${p.id}/editar`" class="boton">Editar</NuxtLink></td>
+            <td>
+              <NuxtLink :to="`/pacientes/${p.id}`" class="lista__nombre">{{ p.nombre }}</NuxtLink>
+            </td>
+            <td class="num">{{ p.cedula }}</td>
+            <td class="col-sec">{{ p.contacto || "—" }}</td>
+            <td class="col-sec">
+              <span class="etiqueta" :class="p.consentimientoFirmado ? 'etiqueta--ok' : 'etiqueta--gris'">
+                {{ p.consentimientoFirmado ? "Firmado" : "Pendiente" }}
+              </span>
+            </td>
+            <td class="lista__acciones">
+              <NuxtLink :to="`/pacientes/${p.id}`" class="boton accion-ver">Ver</NuxtLink>
+              <NuxtLink :to="`/pacientes/${p.id}/editar`" class="boton">Editar</NuxtLink>
+            </td>
           </tr>
         </tbody>
       </table>
+    </div>
 
-      <p v-else-if="!cargando">No hay pacientes que coincidan.</p>
-    </section>
-  </main>
+    <p v-else-if="!cargando" class="mensaje-vacio">
+      {{ q.trim() ? `Ningún paciente coincide con “${q}”.` : "Todavía no hay pacientes registrados." }}
+    </p>
+  </div>
 </template>
 
 <style scoped>
-.panel { min-height: 100vh; font-family: system-ui, sans-serif; color: #1c2430; background: #f3f5f7; }
-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1.5rem; background: #fff; border-bottom: 1px solid #dfe3e8;
+.lista {
+  display: grid;
+  gap: 1.1rem;
 }
-h1 { font-size: 1.1rem; margin: 0; }
-.contenido { padding: 1.5rem; display: grid; gap: 1rem; }
-.busqueda {
-  max-width: 380px; padding: 0.55rem 0.75rem;
-  border: 1px solid #cdd4db; border-radius: 8px; font-size: 1rem;
+
+.lista__cabecera {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
-table { border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; }
-th, td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid #eef1f4; font-size: 0.93rem; }
-th { background: #f7f9fb; font-weight: 600; }
-.boton {
-  padding: 0.4rem 0.9rem; border: 1px solid #cdd4db; border-radius: 8px;
-  background: #fff; cursor: pointer; text-decoration: none; color: #1c2430; font-size: 0.9rem;
+
+.lista__conteo {
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  margin-top: 0.15rem;
 }
-.boton:hover { background: #f0f2f5; }
-.boton.primario { background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600; }
-.boton.primario:hover { background: #1d4fc4; }
-.error { color: #b42318; }
-.enlace { color: #2563eb; text-decoration: none; }
-.enlace:hover { text-decoration: underline; }
-.visualmente-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+.lista__filtro {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.lista__filtro input {
+  flex: 1;
+  max-width: 380px;
+}
+
+.lista__buscando {
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+
+.lista__nombre {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--texto);
+}
+
+.lista__nombre:hover {
+  color: var(--acento);
+  text-decoration: underline;
+}
+
+.lista__acciones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.lista__acciones .boton {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.82rem;
+}
+
+@media (max-width: 560px) {
+  .lista__filtro input {
+    max-width: none;
+  }
+}
+
+/* En pantallas chicas: solo lo esencial. El nombre ya enlaza al paciente. */
+@media (max-width: 720px) {
+  .col-sec {
+    display: none;
+  }
+
+  .accion-ver {
+    display: none;
+  }
+
+  .lista__acciones .boton {
+    padding: 0.35rem 0.8rem;
+  }
+}
 </style>

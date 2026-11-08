@@ -1,4 +1,6 @@
 <script setup lang="ts">
+definePageMeta({ layout: "auth" });
+
 const usuario = useUsuario();
 const email = ref("");
 const password = ref("");
@@ -24,83 +26,83 @@ async function entrar() {
 </script>
 
 <template>
-  <main class="login">
-    <form class="tarjeta" @submit.prevent="entrar">
+  <div class="entrar">
+    <div class="entrar__marca">
+      <span class="entrar__signo" aria-hidden="true">✚</span>
       <h1>Gestor de Pacientes</h1>
-      <p class="subtítulo">Acceso al sistema clínico</p>
+    </div>
+    <p class="entrar__ayuda">Acceso al sistema clínico</p>
 
-      <label for="email">Email</label>
-      <input
-        id="email"
-        v-model="email"
-        type="email"
-        autocomplete="email"
-        required
-        placeholder="nombre@clinica.local"
-      />
+    <form class="formulario" @submit.prevent="entrar">
+      <div class="campo">
+        <label for="email">Email</label>
+        <input
+          id="email"
+          v-model="email"
+          type="email"
+          autocomplete="email"
+          required
+          placeholder="nombre@clinica.local"
+        />
+      </div>
 
-      <label for="password">Contraseña</label>
-      <input
-        id="password"
-        v-model="password"
-        type="password"
-        autocomplete="current-password"
-        required
-      />
+      <div class="campo">
+        <label for="password">Contraseña</label>
+        <input
+          id="password"
+          v-model="password"
+          type="password"
+          autocomplete="current-password"
+          required
+        />
+      </div>
 
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
+      <p v-if="error" class="mensaje-error" role="alert">{{ error }}</p>
 
-      <button type="submit" :disabled="cargando">
+      <button type="submit" class="primario" :disabled="cargando">
         {{ cargando ? "Ingresando…" : "Ingresar" }}
       </button>
     </form>
-  </main>
+  </div>
 </template>
 
 <style scoped>
-.login {
-  min-height: 100vh;
+.entrar {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.entrar__marca {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.entrar__signo {
   display: grid;
   place-items: center;
-  background: #f3f5f7;
-  font-family: system-ui, sans-serif;
-  color: #1c2430;
-}
-.tarjeta {
-  background: #fff;
-  border: 1px solid #dfe3e8;
-  border-radius: 12px;
-  padding: 2.5rem;
-  width: min(380px, 90vw);
-  display: grid;
-  gap: 0.5rem;
-}
-h1 { font-size: 1.35rem; margin: 0; }
-.subtítulo { margin: 0 0 1rem; color: #66727f; font-size: 0.9rem; }
-label { font-size: 0.85rem; font-weight: 600; margin-top: 0.75rem; }
-input {
-  padding: 0.6rem 0.75rem;
-  border: 1px solid #cdd4db;
-  border-radius: 8px;
-  font-size: 1rem;
-}
-input:focus-visible, button:focus-visible { outline: 2px solid #2563eb; outline-offset: 1px; }
-button {
-  margin-top: 1.25rem;
-  padding: 0.65rem;
-  border: none;
-  border-radius: 8px;
-  background: #2563eb;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 7px;
+  background: var(--acento);
   color: #fff;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
 }
-button:hover { background: #1d4fc4; }
-button:disabled { opacity: 0.6; cursor: wait; }
-.error {
-  margin: 0.5rem 0 0;
-  color: #b42318;
+
+h1 {
+  font-size: 1.15rem;
+  font-weight: 680;
+}
+
+.entrar__ayuda {
+  color: var(--texto-suave);
   font-size: 0.88rem;
+  margin-bottom: 1.1rem;
+}
+
+.entrar button {
+  margin-top: 0.35rem;
+  padding: 0.62rem;
 }
 </style>

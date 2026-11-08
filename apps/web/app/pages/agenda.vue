@@ -14,46 +14,55 @@ interface Cita {
   pacienteCedula: string;
 }
 
+interface PacienteOpcion {
+  id: number;
+  nombre: string;
+  cedula: string;
+}
+
+const usuario = useUsuario();
 const profesionales = ref<Profesional[]>([]);
 const profesionalId = ref<number | null>(null);
 const fecha = ref(new Date().toISOString().split("T")[0]);
 const citas = ref<Cita[]>([]);
-const cargando = ref(false);
+const pacientes = ref<PacienteOpcion[]>([]);
+const cargando = ref(true);
 const error = ref("");
 
-// Formulario de nueva cita.
-const nuevaCita = ref({
-  pacienteId: 0,
-  fechaHora: "",
-  hora: "09:00",
-});
-const pacientesDisponibles = ref<{ id: number; nombre: string; cedula: string }[]>([]);
+const nueva = ref({ pacienteId: 0, hora: "09:00" });
 const creando = ref(false);
+const confirmando = ref<number | null>(null); // cita pendiente de confirmar cancelación
 
 onMounted(async () => {
   try {
-    profesionales.value = await $fetch<Profesional[]>("/api/profesionales");
-    if (profesionales.value.length > 0) {
-      profesionalId.value = profesionales.value[0].id;
-      await cargarCitas();
-    }
-    // Cargar pacientes para el selector.
-    pacientesDisponibles.value = await $fetch<{ id: number; nombre: string; cedula: string }[]>("/api/pacientes");
+    [profesionales.value, pacientes.value] = await Promise.all([
+      $fetch<Profesional[]>("/api/profesionales"),
+      $fetch<PacienteOpcion[]>("/api/pacientes"),
+    ]);
+
+    // Arrancar en el propio usuario si es profesional; si no, el primero de la lista.
+    const propio = profesionales.value.find((p) => p.id === usuario.value?.id);
+    profesionalId.value = propio?.id ?? profesionales.value[0]?.id ?? null;
+    await cargarCitas();
   } catch {
     error.value = "No se pudo cargar la agenda.";
+    cargando.value = false;
   }
 });
 
 async function cargarCitas() {
-  if (!profesionalId.value) return;
+  if (!profesionalId.value) {
+    citas.value = [];
+    cargando.value = false;
+    return;
+  }
   cargando.value = true;
-  error.value = "";
   try {
     citas.value = await $fetch<Cita[]>("/api/citas", {
       query: { profesionalId: profesionalId.value, desde: fecha.value },
     });
   } catch {
-    error.value = "No se pudo cargar las citas.";
+    error.value = "No se pudieron cargar las citas.";
   } finally {
     cargando.value = false;
   }
@@ -62,71 +71,92 @@ async function cargarCitas() {
 watch([profesionalId, fecha], cargarCitas);
 
 async function crearCita() {
-  if (!profesionalId.value || !nuevaCita.value.pacienteId || !nuevaCita.value.hora) {
-    error.value = "Completá todos los campos.";
+  error.value = "";
+  if (!profesionalId.value || !nueva.value.pacienteId) {
+    error.value = "Elegí un paciente y una hora.";
     return;
   }
   creando.value = true;
-  error.value = "";
   try {
-    const fechaHora = new Date(`${fecha.value}T${nuevaCita.value.hora}:00`).toISOString();
     await $fetch("/api/citas", {
       method: "POST",
       body: {
-        pacienteId: nuevaCita.value.pacienteId,
+        pacienteId: nueva.value.pacienteId,
         profesionalId: profesionalId.value,
-        fechaHora,
+        fechaHora: new Date(`${fecha.value}T${nueva.value.hora}:00`).toISOString(),
       },
     });
-    nuevaCita.value = { pacienteId: 0, fechaHora: "", hora: "09:00" };
+    nueva.value = { pacienteId: 0, hora: "09:00" };
     await cargarCitas();
   } catch (err: unknown) {
-    const msg = (err as { data?: { error?: string } }).data?.error;
-    error.value = msg || "No se pudo crear la cita.";
+    error.value = (err as { data?: { error?: string } }).data?.error || "No se pudo crear la cita.";
   } finally {
     creando.value = false;
   }
 }
 
 async function cancelarCita(id: number) {
-  if (!confirm("¿Cancelar esta cita?")) return;
+  error.value = "";
   try {
     await $fetch(`/api/citas/${id}`, { method: "DELETE" });
+    confirmando.value = null;
     await cargarCitas();
   } catch {
     error.value = "No se pudo cancelar la cita.";
   }
 }
 
-function formatearHora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" });
-}
+const hora = (iso: string) =>
+  new Date(iso).toLocaleTimeString("es-UY", { hour: "2-digit", minute: "2-digit" });
+
+const fechaLegible = computed(() =>
+  new Date(`${fecha.value}T12:00:00`).toLocaleDateString("es-UY", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }),
+);
+
+const agendadas = computed(() => citas.value.filter((c) => c.estado !== "cancelada"));
 </script>
 
 <template>
-  <main class="panel">
-    <header>
-      <h1>Agenda</h1>
-    </header>
-
-    <section class="contenido">
-      <div class="filtros">
-        <label for="profesional">Profesional</label>
-        <select id="profesional" v-model="profesionalId">
-          <option v-for="p in profesionales" :key="p.id" :value="p.id">{{ p.email }}</option>
-        </select>
-
-        <label for="fecha">Fecha</label>
-        <input id="fecha" v-model="fecha" type="date" />
+  <div class="agenda">
+    <header class="agenda__cabecera">
+      <div>
+        <h1>Agenda</h1>
+        <p class="agenda__subtitulo">{{ fechaLegible }}</p>
       </div>
 
-      <p v-if="error" role="alert" class="error">{{ error }}</p>
-      <p v-else-if="cargando">Cargando citas…</p>
+      <div class="agenda__filtros">
+        <div class="campo">
+          <label for="profesional">Profesional</label>
+          <select id="profesional" v-model="profesionalId">
+            <option v-for="p in profesionales" :key="p.id" :value="p.id">{{ p.email }}</option>
+          </select>
+        </div>
+        <div class="campo">
+          <label for="fecha">Fecha</label>
+          <input id="fecha" v-model="fecha" type="date" />
+        </div>
+      </div>
+    </header>
 
-      <div v-else class="agenda">
-        <h2>Citas del día ({{ citas.length }})</h2>
+    <p v-if="error" class="mensaje-error" role="alert">{{ error }}</p>
 
-        <table v-if="citas.length">
+    <section class="seccion">
+      <div class="seccion__cabecera">
+        <h2>Citas del día</h2>
+        <span class="etiqueta etiqueta--gris num">{{ agendadas.length }} agendadas</span>
+      </div>
+
+      <p v-if="cargando" class="mensaje-vacio">Cargando citas…</p>
+      <p v-else-if="citas.length === 0" class="mensaje-vacio">
+        No hay citas para esta fecha. Creá una abajo.
+      </p>
+
+      <div v-else class="tabla-envoltura">
+        <table>
           <thead>
             <tr>
               <th scope="col">Hora</th>
@@ -137,88 +167,143 @@ function formatearHora(iso: string): string {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="c in citas" :key="c.id" :class="{ cancelada: c.estado === 'cancelada' }">
-              <td>{{ formatearHora(c.fechaHora) }}</td>
-              <td>{{ c.pacienteNombre }}</td>
-              <td>{{ c.pacienteCedula }}</td>
-              <td>{{ c.estado }}</td>
+            <tr v-for="c in citas" :key="c.id" :class="{ 'fila--cancelada': c.estado === 'cancelada' }">
+              <td class="num">{{ hora(c.fechaHora) }}</td>
               <td>
-                <button
-                  v-if="c.estado === 'agendada'"
-                  class="boton peligro"
-                  @click="cancelarCita(c.id)"
-                >
-                  Cancelar
-                </button>
+                <NuxtLink :to="`/pacientes/${c.pacienteId}`" class="agenda__paciente">
+                  {{ c.pacienteNombre }}
+                </NuxtLink>
+              </td>
+              <td class="num">{{ c.pacienteCedula }}</td>
+              <td>
+                <span class="etiqueta" :class="c.estado === 'cancelada' ? 'etiqueta--gris' : 'etiqueta--ok'">
+                  {{ c.estado }}
+                </span>
+              </td>
+              <td class="agenda__acciones">
+                <template v-if="c.estado === 'agendada'">
+                  <template v-if="confirmando === c.id">
+                    <button class="peligro" @click="cancelarCita(c.id)">Confirmar</button>
+                    <button @click="confirmando = null">No</button>
+                  </template>
+                  <button v-else @click="confirmando = c.id">Cancelar</button>
+                </template>
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+    </section>
 
-        <p v-else>No hay citas para esta fecha.</p>
-
-        <form class="nueva-cita" @submit.prevent="crearCita">
-          <h3>Nueva cita</h3>
-          <label for="paciente">Paciente</label>
-          <select id="paciente" v-model="nuevaCita.pacienteId" required>
-            <option :value="0" disabled>Seleccionar paciente…</option>
-            <option v-for="p in pacientesDisponibles" :key="p.id" :value="p.id">
-              {{ p.nombre }} ({{ p.cedula }})
-            </option>
-          </select>
-
-          <label for="hora">Hora</label>
-          <input id="hora" v-model="nuevaCita.hora" type="time" required />
-
+    <section class="tarjeta nueva">
+      <h2>Nueva cita</h2>
+      <form class="formulario" @submit.prevent="crearCita">
+        <div class="nueva__fila">
+          <div class="campo">
+            <label for="paciente">Paciente</label>
+            <select id="paciente" v-model="nueva.pacienteId" required>
+              <option :value="0" disabled>Seleccionar paciente…</option>
+              <option v-for="p in pacientes" :key="p.id" :value="p.id">
+                {{ p.nombre }} — {{ p.cedula }}
+              </option>
+            </select>
+          </div>
+          <div class="campo nueva__hora">
+            <label for="hora">Hora</label>
+            <input id="hora" v-model="nueva.hora" type="time" required />
+          </div>
           <button type="submit" class="primario" :disabled="creando">
             {{ creando ? "Creando…" : "Crear cita" }}
           </button>
-        </form>
-      </div>
+        </div>
+      </form>
     </section>
-  </main>
+  </div>
 </template>
 
 <style scoped>
-.panel { min-height: 100vh; font-family: system-ui, sans-serif; color: #1c2430; background: #f3f5f7; }
-header {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1.5rem; background: #fff; border-bottom: 1px solid #dfe3e8;
+.agenda {
+  display: grid;
+  gap: 1.75rem;
 }
-h1 { font-size: 1.1rem; margin: 0; }
-h2 { font-size: 1rem; margin: 1.5rem 0 0.75rem; }
-h3 { font-size: 0.95rem; margin: 0 0 0.75rem; }
-.contenido { padding: 1.5rem; display: grid; gap: 1rem; }
-.filtros {
-  display: flex; gap: 1rem; align-items: end; flex-wrap: wrap;
+
+.agenda__cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
 }
-.filtros label { display: grid; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; }
-select, input[type="date"], input[type="time"] {
-  padding: 0.55rem 0.75rem; border: 1px solid #cdd4db; border-radius: 8px; font-size: 1rem;
-  background: #fff;
+
+.agenda__subtitulo {
+  color: var(--texto-suave);
+  font-size: 0.9rem;
+  text-transform: capitalize;
+  margin-top: 0.1rem;
 }
-table { border-collapse: collapse; background: #fff; border-radius: 10px; overflow: hidden; width: 100%; }
-th, td { padding: 0.6rem 1rem; text-align: left; border-bottom: 1px solid #eef1f4; font-size: 0.93rem; }
-th { background: #f7f9fb; font-weight: 600; }
-tr.cancelada { opacity: 0.5; text-decoration: line-through; }
-.boton {
-  padding: 0.4rem 0.9rem; border: 1px solid #cdd4db; border-radius: 8px;
-  background: #fff; cursor: pointer; font-size: 0.9rem;
+
+.agenda__filtros {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
-.boton:hover { background: #f0f2f5; }
-.boton.peligro { border-color: #dc2626; color: #dc2626; }
-.boton.peligro:hover { background: #fef2f2; }
-.boton.primario {
-  background: #2563eb; border-color: #2563eb; color: #fff; font-weight: 600;
-  padding: 0.55rem 1.2rem; margin-top: 0.75rem;
+
+.agenda__paciente {
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--texto);
 }
-.boton.primario:hover { background: #1d4fc4; }
-.boton:disabled { opacity: 0.6; cursor: wait; }
-.nueva-cita {
-  background: #fff; padding: 1.5rem; border-radius: 10px; margin-top: 2rem;
-  display: grid; gap: 0.4rem; max-width: 400px;
+
+.agenda__paciente:hover {
+  color: var(--acento);
+  text-decoration: underline;
 }
-.nueva-cita label { font-size: 0.85rem; font-weight: 600; margin-top: 0.75rem; }
-.error { color: #b42318; }
-.visualmente-oculto { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+
+.agenda__acciones {
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.agenda__acciones button {
+  padding: 0.3rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.fila--cancelada td {
+  opacity: 0.55;
+}
+
+.fila--cancelada .agenda__paciente {
+  text-decoration: line-through;
+}
+
+.nueva h2 {
+  margin-bottom: 0.85rem;
+}
+
+.nueva__fila {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.nueva__fila .campo:first-child {
+  flex: 1;
+  min-width: 220px;
+}
+
+.nueva__hora input {
+  width: 8rem;
+}
+
+@media (max-width: 560px) {
+  .nueva__fila .campo:first-child {
+    min-width: 100%;
+  }
+  .nueva__fila button {
+    width: 100%;
+  }
+}
 </style>
