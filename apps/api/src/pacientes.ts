@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { and, eq, ilike, or } from "drizzle-orm";
+import { and, eq, between, ilike, or } from "drizzle-orm";
 import { db } from "./db/client";
-import { pacientes } from "./db/schema";
+import { pacientes, usuarios } from "./db/schema";
 import type { EnvAuth } from "./auth";
 import { auditar } from "./auditoria";
 
@@ -17,6 +17,15 @@ const pacienteSchema = z.object({
 const pacienteActualizable = pacienteSchema.partial();
 
 export const pacientesRouter = new Hono<EnvAuth>();
+
+// Listar profesionales (usuarios con rol "profesional").
+pacientesRouter.get("/profesionales", async (c) => {
+  const filas = await db
+    .select({ id: usuarios.id, email: usuarios.email })
+    .from(usuarios)
+    .where(and(eq(usuarios.rol, "profesional"), eq(usuarios.activo, true)));
+  return c.json(filas);
+});
 
 pacientesRouter.use("/pacientes", auditar("pacientes"));
 pacientesRouter.use("/pacientes/*", auditar("pacientes"));

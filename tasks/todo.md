@@ -36,14 +36,16 @@
 - [x] Auditoría registra cada acción (crear, editar, listar verificados en BD)
 - [x] Búsqueda por cedula/nombre
 
-## Phase 3: Agenda
-- [ ] Task 14: Esquema Drizzle — `citas`
-- [ ] Task 15: API crear/listar/cancelar citas
-- [ ] Task 16: Nuxt vista diaria agenda
+## Phase 3: Agenda ✅
+- [x] Task 14: Esquema Drizzle — `citas` (ya existía del Fase 0)
+- [x] Task 15: API crear/listar/cancelar citas (validación Zod, choque de horario 409, cancelación lógica)
+- [x] Task 16: Nuxt vista diaria agenda (selector de profesional/fecha, lista, crear/cancelar inline)
 
-### Checkpoint: Agenda
-- [ ] Crear/cancelar cita desde UI
-- [ ] Vista diaria por profesional
+### Checkpoint: Agenda ✅
+- [x] Crear/cancelar cita desde UI (verificado con agent-browser)
+- [x] Vista diaria por profesional (bug de zona horaria corregido)
+- [x] Choque de horario → 409
+- [x] 5 tests nuevos (18 en total, todos pasando)
 
 ## Phase 4: Consultas + Medicación
 - [ ] Task 17: Esquema Drizzle — `consultas` + `medicacion`

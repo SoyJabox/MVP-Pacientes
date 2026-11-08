@@ -1,12 +1,25 @@
-// Crea el usuario admin inicial si no existe.
-// Uso: bun run scripts/seed-admin.ts <email> <password>
+// Crea un usuario si no existe.
+// Uso: bun run scripts/seed-admin.ts <email> <password> [--rol admin|recepcion|profesional]
 import { eq } from "drizzle-orm";
 import { db } from "../src/db/client";
 import { usuarios } from "../src/db/schema";
+import type { Rol } from "@gestor/shared";
 
-const [email, password] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const rolIdx = args.indexOf("--rol");
+let rol: Rol = "admin";
+if (rolIdx !== -1) {
+  const v = args[rolIdx + 1];
+  if (v !== "admin" && v !== "recepcion" && v !== "profesional") {
+    console.error("Rol inválido. Opciones: admin, recepcion, profesional");
+    process.exit(1);
+  }
+  rol = v;
+  args.splice(rolIdx, 2);
+}
+const [email, password] = args;
 if (!email || !password) {
-  console.error("Uso: bun run scripts/seed-admin.ts <email> <password>");
+  console.error("Uso: bun run scripts/seed-admin.ts <email> <password> [--rol admin|recepcion|profesional]");
   process.exit(1);
 }
 
@@ -17,6 +30,6 @@ if (existente) {
 }
 
 const passwordHash = await Bun.password.hash(password);
-await db.insert(usuarios).values({ email: email.toLowerCase().trim(), passwordHash, rol: "admin" });
-console.log(`Admin ${email} creado.`);
+await db.insert(usuarios).values({ email: email.toLowerCase().trim(), passwordHash, rol });
+console.log(`Usuario ${email} creado (rol: ${rol}).`);
 process.exit(0);

@@ -20,8 +20,9 @@ async function salir() {
     <section class="contenido">
       <nav class="atajos">
         <NuxtLink to="/pacientes" class="atajo">Pacientes</NuxtLink>
+        <NuxtLink to="/agenda" class="atajo">Agenda</NuxtLink>
       </nav>
-      <p>Sesión iniciada. La agenda y consultas llegan en las próximas fases.</p>
+      <p>Sesión iniciada. Las consultas y documentos llegan en las próximas fases.</p>
     </section>
   </main>
 </template>
