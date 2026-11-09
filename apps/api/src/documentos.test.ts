@@ -118,6 +118,56 @@ describe("CDA nivel 1", () => {
     expect(sinDx).not.toContain("<entry>");
   });
 
+  test("estructura CDA R2: cabecera obligatoria, OIDs válidos y texto en cada sección", async () => {
+    const xml = generarCdaNivel1({
+      paciente: { nombre: "Juan Pérez", cedula: "12345678", fechaNacimiento: "1980-04-12" },
+      profesional: { nombre: "Dra. Luisa Prueba", id: 7 },
+      consulta: { id: 42, fecha: new Date("2026-11-08T14:30:00Z"), motivo: "Cefalea", evolucion: "Sin signos de alarma", diagnosticoCie10: "G44.2" },
+      medicacion: [{ medicamento: "Ibuprofeno 400 mg", dosis: "1 cada 8 h", duracion: "3 días" }],
+    });
+
+    const doc = create(xml).root();
+    const hijos = (n: typeof doc) => Array.from(n.node.childNodes as unknown as { nodeName: string }[]).map((c) => c.nodeName);
+
+    // Orden obligatorio de la cabecera CDA R2 (HL7 V3).
+    const nombres = hijos(doc).filter((n) => !n.startsWith("#"));
+    expect(nombres.slice(0, 10)).toEqual([
+      "realmCode",
+      "typeId",
+      "templateId",
+      "id",
+      "code",
+      "title",
+      "effectiveTime",
+      "confidentialityCode",
+      "languageCode",
+      "author",
+    ]);
+    expect(nombres).toContain("custodian");
+    expect(nombres).toContain("component");
+
+    // effectiveTime CDA: yyyymmddHHMMSS, 14 dígitos.
+    expect(xml).toMatch(/<effectiveTime value="\d{14}"\/>/);
+
+    // Todos los templateId y OIDs declarados son OIDs numéricos válidos.
+    const oids = [...xml.matchAll(/(?:root|codeSystem)="([^"]+)"/g)].map((m) => m[1]);
+    expect(oids.length).toBeGreaterThan(5);
+    for (const oid of oids) expect(oid).toMatch(/^\d+(\.\d+)+$/);
+
+    // Toda sección necesita code + title + text (el texto es obligatorio en CDA).
+    const secciones = [...xml.matchAll(/<section>([\s\S]*?)<\/section>/g)].map((m) => m[1]);
+    expect(secciones.length).toBeGreaterThanOrEqual(3);
+    for (const s of secciones) {
+      expect(s).toContain("<code ");
+      expect(s).toContain("<title>");
+      expect(s).toContain("<text>");
+    }
+
+    // CIE-10 declarado con el OID de ICD-10 y el autor es una persona, no un email.
+    expect(xml).toContain('codeSystem="2.16.840.1.113883.6.3"');
+    expect(xml).toContain("<name>Dra. Luisa Prueba</name>");
+  });
+
   test("recepción NO puede generar CDA (403)", async () => {
     const res = await app.request(`/consultas/${consultaId}/cda`, { headers: await headers(recepcionId, "recepcion") });
     expect(res.status).toBe(403);

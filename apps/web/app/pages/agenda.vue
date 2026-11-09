@@ -1,7 +1,7 @@
 <script setup lang="ts">
 interface Profesional {
   id: number;
-  email: string;
+  nombre: string;
 }
 
 interface Cita {
@@ -144,7 +144,7 @@ const agendadas = computed(() => citas.value.filter((c) => c.estado === "agendad
         <div class="campo">
           <label for="profesional">Profesional</label>
           <select id="profesional" v-model="profesionalId">
-            <option v-for="p in profesionales" :key="p.id" :value="p.id">{{ p.email }}</option>
+            <option v-for="p in profesionales" :key="p.id" :value="p.id">{{ p.nombre }}</option>
           </select>
         </div>
         <div class="campo">

@@ -74,10 +74,13 @@ go /agenda
 ab wait --text "Citas del día"
 check_snap "Citas del día" "agenda carga"
 
-echo "6b. Usuarios (solo admin) + métricas en inicio"
+echo "6b. Usuarios + auditoría (solo admin) + métricas en inicio"
 go /usuarios
 ab wait --text "Nuevo usuario"
 check_snap "Nuevo usuario" "página de usuarios admin"
+go /auditoria
+ab wait --text "Registro de cada acceso"
+check_snap "Registro de cada acceso" "página de auditoría admin"
 go /
 ab wait --text "CIE-10 FRECUENTES"
 check_snap "CIE-10 FRECUENTES" "métricas clínicas en inicio"
@@ -99,6 +102,11 @@ if agent-browser --session "$SESS" snapshot 2>/dev/null | grep -q "Nueva consult
   fail "recepción no ve formulario de consulta"
 else
   ok "recepción no ve formulario de consulta"
+fi
+if agent-browser --session "$SESS" snapshot 2>/dev/null | grep -qE 'link "(Usuarios|Auditoría)"'; then
+  fail "recepción no ve enlaces de administración"
+else
+  ok "recepción no ve enlaces de administración"
 fi
 
 ab close

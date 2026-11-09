@@ -12,6 +12,7 @@ import { consultasRouter } from "./consultas";
 import { documentosRouter } from "./documentos";
 import { usuariosRouter } from "./usuarios";
 import { estadisticasRouter } from "./estadisticas";
+import { auditoriaRouter } from "./auditoria";
 
 const app = new Hono<EnvAuth>();
 
@@ -60,6 +61,22 @@ app.use(
     handler: (c) => c.json({ error: "Demasiadas requests. Intentá de nuevo en un minuto." }, 429),
   }),
 );
+
+// Límite más estricto para escritura: un alta/edición masiva accidental o un
+// script suelto no debe poder inundar la base (el límite global es por request).
+const ESCRITURA = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+app.use(
+  "*",
+  rateLimiter({
+    windowMs: 60 * 1000,
+    limit: 30,
+    standardHeaders: true,
+    legacyHeaders: false,
+    keyGenerator: (c) => c.req.header("x-forwarded-for") || c.req.header("host") || "unknown",
+    skip: (c) => !ESCRITURA.has(c.req.method),
+    handler: (c) => c.json({ error: "Demasiadas escrituras seguidas. Esperá un minuto." }, 429),
+  }),
+);
 }
 
 // Salud
@@ -96,6 +113,7 @@ app.route("/", consultasRouter);
 app.route("/", documentosRouter);
 app.route("/", usuariosRouter);
 app.route("/", estadisticasRouter);
+app.route("/", auditoriaRouter);
 
 // Quién soy: Nuxt lo usa para restaurar la sesión al recargar.
 app.get("/me", async (c) => {

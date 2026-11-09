@@ -17,6 +17,10 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - [x] Gestión de usuarios en UI (crear/desactivar, solo admin)
 - [x] Baja en UI (paciente y documento, con confirmación)
 - [x] Tests contra BD separada (`scripts/test.sh`)
+- [x] Auditoría consultable por el admin (`GET /auditoria` + pantalla)
+- [x] Directorio de profesionales sin emails (minimización)
+- [x] Rate limit de escritura (30/min) además del global
+- [x] Invariantes CDA R2 testeadas (cabecera, OIDs, effectiveTime, text)
 - [x] Recordatorios de citas próximas 24 h (`scripts/recordatorios.ts`)
 - [x] Métricas clínicas en el dashboard (`/estadisticas`)
 - [x] Índice trigram para la búsqueda de pacientes (`scripts/setup-trgm.sql`)
@@ -139,3 +143,17 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Hallazgos de la auditoría: `POST /citas` con profesional ajeno ahora devuelve 403 (antes 400 por rol inválido); test actualizado. `/profesionales` sigue listando emails a cualquier rol autenticado (directorio, no datos de agenda) — decisión registrada, no es chusmerío de agenda.
 - Decisiones tomadas: admin y recepción conservan acceso total a agendas (recepción lo necesita para agendar); no se crea endpoint de agenda propia separado — el `profesionalId` sigue siendo explícito con chequeo en API.
 - Siguiente paso: piloto con datos reales, validar CDA nivel 3 contra Salud.uy.
+
+## Iteración 9 — Cierre de los hallazgos abiertos del escaneo (S10‑S14)
+- Objetivo: implementar los hallazgos que quedaban abiertos del escaneo e2e, sin tecnología nueva.
+- Hallazgos cerrados (test primero en todos):
+  - **S10** `/profesionales` exponía el email de cada profesional a cualquier rol autenticado → ahora devuelve solo `id` + `nombre` (fallback `Profesional N`, nunca el email). La agenda muestra el nombre.
+  - **S11** sin límite específico de escritura → 30 escrituras/min además del global de 100 (`skip` para métodos de lectura). Verificado en vivo: 29 OK y luego 429; 35 lecturas seguidas sin corte.
+  - **S12** auditoría escribible pero no consultable (la constancia HCEN no se podía leer) → `GET /auditoria` (solo admin, filtros `entidad`/`entidadId`/`usuarioId`, `limit` 1‑500) + pantalla `/auditoria` con filtros. Consultar la auditoría también queda asentado.
+  - **S13** ver un paciente puntual se registraba como `listar` → el middleware ahora deduce `ver` cuando el GET trae id en el path (era la intención documentada del código).
+  - **S14** CDA sin verificación estructural (no hay acceso a los templates de Salud.uy) → test de invariantes CDA R2: orden obligatorio de la cabecera, `effectiveTime` de 14 dígitos, todos los `root`/`codeSystem` son OIDs numéricos, toda sección tiene `code` + `title` + `text`, CIE‑10 con OID de ICD‑10 y autor con nombre de persona.
+- Datos: cuentas de prueba viejas (`*@test.local`, `desactivado-*`, `tmpdesact`) desactivadas para que no ensucien el directorio; nombre real cargado en `prof@clinica.local` (Dra. Lucía Ferrari) y `recepcion*` (Recepción).
+- Pruebas ejecutadas y resultado: `scripts/test.sh` **99/99 pass** (230 expects, 9 archivos); web build OK (3.52s); `scripts/e2e.sh` **17/17 verde** (sumados: página de auditoría, recepción sin enlaces de administración); verificación en vivo de `/profesionales`, `/auditoria` (admin 200 / recepción 403) y del rate limit de escritura.
+- Hallazgos de la auditoría propia: el límite de escritura es por IP con fallback al header `host`, así que detrás de un proxy sin `x-forwarded-for` todos comparten cubeta — aceptable para un consultorio con un usuario, riesgo anotado.
+- Decisiones tomadas: consultar la auditoría deja registro (acceso sensible); el directorio no expone emails (minimización); el límite de escritura se desactiva en tests como el global (evita flakes).
+- Siguiente paso: piloto con datos reales y validación del CDA contra los templates oficiales de Salud.uy (los dos únicos puntos que dependen de recursos externos).

@@ -34,13 +34,17 @@ const pacienteActualizable = pacienteSchema.partial();
 
 export const pacientesRouter = new Hono<EnvAuth>();
 
-// Listar profesionales (usuarios con rol "profesional").
+// Directorio de profesionales activos: solo id y nombre para mostrar.
+// El email es dato de contacto y no hace falta para agendar (minimización);
+// una cuenta vieja sin nombre cargado se muestra como "Profesional N".
 pacientesRouter.get("/profesionales", async (c) => {
   const filas = await db
-    .select({ id: usuarios.id, email: usuarios.email })
+    .select({ id: usuarios.id, nombre: usuarios.nombre })
     .from(usuarios)
-    .where(and(eq(usuarios.rol, "profesional"), eq(usuarios.activo, true)));
-  return c.json(filas);
+    .where(and(eq(usuarios.rol, "profesional"), eq(usuarios.activo, true)))
+    .orderBy(usuarios.nombre, usuarios.id);
+
+  return c.json(filas.map((f) => ({ id: f.id, nombre: f.nombre || `Profesional ${f.id}` })));
 });
 
 pacientesRouter.use("/pacientes", auditar("pacientes"));
