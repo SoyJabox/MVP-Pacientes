@@ -12,6 +12,8 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - [x] Revisar cumplimiento HCEN/CDA nivel 1
 - [x] Auditar seguridad (JWT, RBAC, auditoría, upload de archivos)
 - [x] Corregir hallazgos de auditoría e2e (iteración 4)
+- [x] Limpiar BD a máximo 10 pacientes
+- [x] Pruebas reales en navegador (E2E manual con agent-browser)
 - [ ] Probar con datos reales (piloto)
 - [x] Documentar cómo ejecutar el proyecto completamente
 
@@ -77,4 +79,21 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Pruebas ejecutadas y resultado: `bun test` **81/81 pass** (129 expects, antes 68); web build OK (3.54s); re-verificación en vivo contra API reiniciada: 10/10 sondas correctas (403/409/400/404/400/400/`q=% → []`/agenda nocturna incluye cita 01:00Z/historia con medicación OK/`?limit=2 → 2`/desactivado → 401); backup 56KB + restore verificado (7 tablas coinciden).
 - Hallazgos de la auditoría: cerrados M1–M5 y S1–S8. Quedan como backlog: tests del frontend, piloto con datos reales, CDA nivel 3, campo nombre en usuarios (CDA usa email).
 - Decisiones tomadas: Tests primero por fix; Uruguay UTC-3 fijo para agenda (sin horario de verano desde 2018); `requiereAuth` chequea `activo` en BD (1 query/request, aceptable para 1 usuario).
-- Siguiente paso: implementar correcciones y re-ejecutar todo
+## Iteración 5 — Limpieza a 10 pacientes + pruebas reales en navegador
+- Objetivo: reducir la BD a máximo 10 pacientes y empezar pruebas verdaderas E2E en navegador real (no solo tests de API).
+- Cambios: backup previo (`gestor_pacientes_2026-11-09_002241.dump`); borrados pacientes de prueba y sus dependientes en cascada manual (medicación, documentos, citas, consultas), conservando los 10 con más historia; renombrados a nombres realistas (María González, Juan Pérez, …) + `Paciente Real E2E`; borrados archivos huérfanos de `data/documentos`; borrados 6 usuarios huérfanos `desactivado-*` (los demás usuarios de test referencian historia conservada, quedan).
+- Pruebas ejecutadas y resultado (navegador real, agent-browser, sesión `gestor-94fec84ff9fe`):
+  - Login admin OK; login con clave errónea muestra "Email o contraseña incorrectos."; `/pacientes` sin sesión redirige a `/login`; `/login` con sesión redirige a `/`.
+  - Lista de pacientes + búsqueda ("González" → 1 resultado).
+  - Alta de paciente vía UI → detalle con edad calculada (34 años). [Nota: el input date nativo no toma autocompletado por accesibilidad; con usuario real escribiendo dígitos funciona.]
+  - Consulta + medicación vía UI visibles en historia.
+  - CDA (XML) abre en pestaña nueva con cabecera HCEN.
+  - Subida de PNG real → fila en BD con nombre aleatorio → descarga renderiza la imagen.
+  - Agenda: crear cita (10:30 Uruguay = 13:30Z en BD, TZ correcto) → cancelar con confirmación (estado `cancelada`) → crear otra → marcar `atendida`.
+  - Recepción: ve pacientes/agenda, historia muestra "Tu rol no tiene acceso a la historia clínica" sin formulario ni documentos (captura verificada).
+  - Consola del navegador sin errores en toda la sesión.
+  - Suite API tras la limpieza: **81/81 pass**.
+- Hallazgos de la auditoría: ninguno nuevo. Nota: cada corrida de `bun test` re-agrega pacientes/usuarios de prueba (por eso el conteo sube de nuevo entre limpiezas).
+- Decisiones tomadas: conservar los 10 pacientes con más historia clínica (no los más recientes); no borrar usuarios de test que referencian historia conservada (FK).
+- Estado final: 10 pacientes, 2 citas, 28 consultas, 10 medicación, 0 documentos, 17 usuarios.
+- Siguiente paso: piloto con datos reales (carga de 5-10 pacientes reales y uso diario), o tests E2E automatizados persistentes si se quiere regresión en navegador.
