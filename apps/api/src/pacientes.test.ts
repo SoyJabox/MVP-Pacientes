@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeAll } from "bun:test";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "./db/client";
 import { usuarios, auditoria, pacientes } from "./db/schema";
 import { emitirJwt } from "./auth";
@@ -48,7 +48,7 @@ describe("CRUD pacientes", () => {
     const [reg] = await db
       .select()
       .from(auditoria)
-      .where(eq(auditoria.entidadId, id));
+      .where(and(eq(auditoria.entidadId, id), eq(auditoria.entidadAfectada, "pacientes")));
     expect(reg?.accion).toBe("crear");
     expect(reg?.entidadAfectada).toBe("pacientes");
   });
@@ -188,6 +188,20 @@ describe("CRUD pacientes", () => {
     const res = await app.request("/pacientes?limit=3", { headers: { Authorization: `Bearer ${t}` } });
     const filas = (await res.json()) as { id: number }[];
     expect(filas.length).toBe(3);
+  });
+
+  test("búsqueda con índice trigram: sigue encontrando por nombre parcial", async () => {
+    const t = await token();
+    const c = { ...cuerpo(), nombre: "Trigramasa Prueba" };
+    const creada = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify(c),
+    });
+    const { id } = await creada.json<{ id: number }>();
+    const res = await app.request("/pacientes?q=trigramas", { headers: { Authorization: `Bearer ${t}` } });
+    const filas = (await res.json()) as { id: number }[];
+    expect(filas.some((f) => f.id === id)).toBe(true);
   });
 
   test("401 sin token", async () => {

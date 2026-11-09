@@ -101,6 +101,28 @@ async function guardarMedicacion(consultaId: number) {
   }
 }
 
+const eliminarDoc = async (docId: number) => {
+  if (!confirm("¿Eliminar este documento? Esta acción no se puede deshacer.")) return;
+  error.value = "";
+  try {
+    await $fetch(`/api/documentos/${docId}`, { method: "DELETE" });
+    documentos.value = await $fetch<Documento[]>(`/api/documentos/paciente/${id}`);
+  } catch {
+    error.value = "No se pudo eliminar el documento.";
+  }
+};
+
+const darDeBaja = async () => {
+  if (!confirm("¿Dar de baja a este paciente? Su historia clínica se conserva, pero deja de listar.")) return;
+  error.value = "";
+  try {
+    await $fetch(`/api/pacientes/${id}`, { method: "DELETE" });
+    await navigateTo("/pacientes");
+  } catch {
+    error.value = "No se pudo dar de baja al paciente.";
+  }
+};
+
 async function subirDocumento(event: Event) {
   const input = event.target as HTMLInputElement;
   const archivo = input.files?.[0];
@@ -148,7 +170,10 @@ const edad = computed(() => {
           <template v-if="edad !== null"> · {{ edad }} años</template>
         </p>
       </div>
-      <NuxtLink v-if="paciente" :to="`/pacientes/${id}/editar`" class="boton">Editar datos</NuxtLink>
+      <div class="fila">
+        <NuxtLink v-if="paciente" :to="`/pacientes/${id}/editar`" class="boton">Editar datos</NuxtLink>
+        <button v-if="paciente" class="peligro" @click="darDeBaja">Dar de baja</button>
+      </div>
     </header>
 
     <p v-if="error" class="mensaje-error" role="alert">{{ error }}</p>
@@ -270,11 +295,12 @@ const edad = computed(() => {
               <p v-if="subiendo" class="historia__ayuda">Subiendo…</p>
 
               <ul v-if="documentos.length" class="docs">
-                <li v-for="d in documentos" :key="d.id">
+                <li v-for="d in documentos" :key="d.id" class="docs__fila">
                   <a :href="`/api/documentos/${d.id}/archivo`" target="_blank" rel="noopener">
                     {{ d.nombreArchivo }}
                   </a>
                   <span class="docs__fecha num">{{ fechaCorta(d.fechaSubida) }}</span>
+                  <button class="peligro docs__eliminar" @click="eliminarDoc(d.id)">Eliminar</button>
                 </li>
               </ul>
               <p v-else class="historia__ayuda">Sin documentos.</p>
@@ -433,6 +459,17 @@ const edad = computed(() => {
 
 .docs li {
   display: grid;
+}
+
+.docs__fila {
+  gap: 0.15rem;
+}
+
+.docs__eliminar {
+  justify-self: start;
+  padding: 0.2rem 0.55rem;
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
 }
 
 .docs a {

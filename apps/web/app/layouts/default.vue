@@ -6,6 +6,8 @@ const enlaces = [
   { to: "/", etiqueta: "Inicio" },
   { to: "/pacientes", etiqueta: "Pacientes" },
   { to: "/agenda", etiqueta: "Agenda" },
+  // La gestión de usuarios solo existe para el admin (la API lo impone igual).
+  ...(usuario.value?.rol === "admin" ? [{ to: "/usuarios", etiqueta: "Usuarios" }] : []),
 ];
 
 const activo = (to: string) => (to === "/" ? ruta.path === "/" : ruta.path.startsWith(to));

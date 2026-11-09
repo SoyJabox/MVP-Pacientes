@@ -78,14 +78,20 @@ scripts/          backup.sh, restaurar.sh
 # prueba de restauración en una base temporal y comparación de conteos
 ./scripts/restaurar.sh backups/gestor_pacientes_2026-11-08_030000.dump
 
-# tests de la API
-cd apps/api && bun test
+# tests de la API contra BD separada (no contaminan la base de desarrollo)
+bash scripts/test.sh
 
 # build de producción del frontend
 cd apps/web && bun run build
 
 # E2E en navegador real (requiere API + Web levantadas)
 bash scripts/e2e.sh
+
+# índice trigram (acelera la búsqueda de pacientes; una sola vez)
+psql "$DATABASE_URL" -f scripts/setup-trgm.sql
+
+# recordatorios de citas próximas 24 h (cron sugerido: 0 8 * * *)
+cd apps/api && bun run scripts/recordatorios.ts
 ```
 
 Cron sugerido para el backup diario:
@@ -117,9 +123,9 @@ Cron sugerido para el backup diario:
 
 ## Verificación completa (checklist)
 
-- [x] API tests: 83/83 pass (`cd apps/api && bun test`)
+- [x] API tests: 90/90 pass (`bash scripts/test.sh`, BD separada)
 - [x] Web build: exitoso (`cd apps/web && bun run build`)
-- [x] E2E en navegador real: `bash scripts/e2e.sh` (login, pacientes, historia, agenda, recepción bloqueada)
+- [x] E2E en navegador real: `bash scripts/e2e.sh` (login, pacientes, historia, agenda, usuarios, métricas, recepción bloqueada)
 - [x] Login end-to-end: admin, profesional, recepcion
 - [x] RBAC: recepción bloqueada en datos clínicos, CDA, documentos, cambio estado citas
 - [x] CDA nivel 1: XML válido con cabecera HCEN, datos paciente, encuentro, medicación

@@ -10,6 +10,8 @@ import { pacientesRouter } from "./pacientes";
 import { citasRouter } from "./citas";
 import { consultasRouter } from "./consultas";
 import { documentosRouter } from "./documentos";
+import { usuariosRouter } from "./usuarios";
+import { estadisticasRouter } from "./estadisticas";
 
 const app = new Hono<EnvAuth>();
 
@@ -92,6 +94,8 @@ app.route("/", pacientesRouter);
 app.route("/", citasRouter);
 app.route("/", consultasRouter);
 app.route("/", documentosRouter);
+app.route("/", usuariosRouter);
+app.route("/", estadisticasRouter);
 
 // Quién soy: Nuxt lo usa para restaurar la sesión al recargar.
 app.get("/me", async (c) => {

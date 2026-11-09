@@ -14,12 +14,14 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - [x] Tests E2E automatizados persistentes (`scripts/e2e.sh`)
 - [x] Campo `nombre` en usuarios (firma del CDA)
 - [x] CDA nivel 3: entries estructurados de diagnóstico (CIE-10)
+- [x] Gestión de usuarios en UI (crear/desactivar, solo admin)
+- [x] Baja en UI (paciente y documento, con confirmación)
+- [x] Tests contra BD separada (`scripts/test.sh`)
+- [x] Recordatorios de citas próximas 24 h (`scripts/recordatorios.ts`)
+- [x] Métricas clínicas en el dashboard (`/estadisticas`)
+- [x] Índice trigram para la búsqueda de pacientes (`scripts/setup-trgm.sql`)
 - [ ] Piloto con datos reales (carga por UI/API; el seed cargó datos ficticios)
 - [ ] Validar entries CDA nivel 3 contra templates oficiales de Salud.uy
-- [ ] **P3** Gestión de usuarios en UI (crear/desactivar) — hoy solo por script
-- [ ] **P3** Botones de baja en UI (paciente/documento): endpoints sin UI
-- [ ] **P3** Limpieza automática de datos de test (cada `bun test` re-agrega pacientes/usuarios)
-- [ ] **P4** Recordatorios de citas; métricas clínicas; búsqueda trigram (>1000 pacientes)
 
 ## Iteración 1
 - Objetivo: Verificar estado actual, levantar servicios y validar funcionamiento end-to-end
@@ -114,3 +116,17 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Hallazgos de la auditoría: apareció un paciente `291 Samira Touch` ajeno a las pruebas del agente; no se tocó. Pacientes totales: 19 (11 previos + 8 del piloto).
 - Decisiones tomadas: entries HL7 estándar (C-CDA) pendientes de validar contra templates oficiales de Salud.uy (no disponibles localmente); no inventar OID locales ni códigos de fármaco.
 - Siguiente paso: piloto con pacientes reales (carga por el usuario), gestión de usuarios en UI (P3) y baja en UI (P3).
+
+## Iteración 7 — Backlog P3/P4 completo (sin tecnología nueva)
+- Objetivo: gestión de usuarios en UI, baja en UI, BD separada para tests, recordatorios, métricas clínicas y búsqueda trigram — todo con Bun/Hono/Drizzle/Postgres/Nuxt.
+- Cambios:
+  - **Usuarios (API+UI):** router `usuarios.ts` (GET/POST/PATCH solo admin, 409 email duplicado, nadie se desactiva a sí mismo, auditoría); página `/usuarios` con alta + reactivar/desactivar; enlace en nav solo para admin. Tests: 4 nuevos.
+  - **Baja en UI:** botón "Dar de baja" en detalle de paciente (soft delete, navega a la lista) y "Eliminar" por documento (pide confirmación), reutilizando los DELETE ya existentes y testeados.
+  - **Tests sin contaminar:** `scripts/test.sh` crea `gestor_pacientes_test`, aplica schema y corre la suite ahí. Al correrlo, un test de auditoría falló por colisión de IDs de secuencia en BD fresca (verifica `entidadId` sin entidad) — corregido filtrando por `entidadAfectada`.
+  - **Recordatorios:** `apps/api/scripts/recordatorios.ts` lista citas agendadas próximas 24 h con contacto del paciente y profesional (verificado en vivo con cita a +20 h; cron sugerido en README). Sin SMTP: el envío queda para cuando se elija canal.
+  - **Métricas:** `GET /estadisticas` (clínicos; recepción 403): pacientes activos, citas 24 h/7 días, top CIE-10, consultas por profesional. Tarjetas en el inicio. Test: 2 nuevos. (Un `&&` de JS en vez de `and()` de Drizzle, detectado antes de commitear.)
+  - **Trigram:** `scripts/setup-trgm.sql` (extensión `pg_trgm` + índices GIN en nombre y cédula); misma semántica `ilike`, búsqueda acelerada. Test de regresión agregado.
+- Pruebas ejecutadas y resultado: `scripts/test.sh` **90/90 pass**; web build OK; `scripts/e2e.sh` **todo verde** (agregada página de usuarios + métricas; un fallo por `text-transform` uppercase corregido en la aserción); endpoints verificados en vivo (usuarios, estadísticas); recordatorios verificados; índices trigram presentes.
+- Hallazgos de la auditoría: ninguno abierto. BD principal purgada a 19 pacientes conocidos (9 renombrados + 8 piloto + 290 E2E + 291 Samira, del usuario).
+- Decisiones tomadas: confirmar bajas con `confirm()` nativo (sin librería); métricas solo para roles clínicos (mismo criterio que historia); test runner crea BD fresca cada vez (dropdb/createdb, determinista).
+- Siguiente paso: piloto con datos reales (carga por el usuario), validar CDA nivel 3 contra Salud.uy.

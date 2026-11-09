@@ -74,6 +74,14 @@ go /agenda
 ab wait --text "Citas del día"
 check_snap "Citas del día" "agenda carga"
 
+echo "6b. Usuarios (solo admin) + métricas en inicio"
+go /usuarios
+ab wait --text "Nuevo usuario"
+check_snap "Nuevo usuario" "página de usuarios admin"
+go /
+ab wait --text "CIE-10 FRECUENTES"
+check_snap "CIE-10 FRECUENTES" "métricas clínicas en inicio"
+
 echo "7. Logout + recepción bloqueada en historia clínica"
 agent-browser --session "$SESS" eval --stdin >/dev/null 2>&1 <<'EOF'
 (function(){ var b = Array.from(document.querySelectorAll('button')).find(x => x.textContent.trim() === 'Salir'); if (b) b.click(); return !!b; })();

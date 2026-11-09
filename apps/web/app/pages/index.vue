@@ -13,6 +13,15 @@ const citasHoy = ref<Cita[]>([]);
 const totalPacientes = ref<number | null>(null);
 const cargando = ref(true);
 
+interface Metricas {
+  totalPacientes: number;
+  citasProximas24h: number;
+  citasProximas7dias: number;
+  cie10Frecuentes: { cie10: string; n: number }[];
+  consultasPorProfesional: { profesional: string; n: number }[];
+}
+const esClinico = computed(() => usuario.value?.rol === "admin" || usuario.value?.rol === "profesional");
+const metricas = ref<Metricas | null>(null);
 
 onMounted(async () => {
   try {
@@ -23,6 +32,9 @@ onMounted(async () => {
     ]);
     totalPacientes.value = pacientes.length;
     citasHoy.value = citas;
+    if (esClinico.value) {
+      metricas.value = await $fetch<Metricas>("/api/estadisticas").catch(() => null);
+    }
   } catch {
     // El resumen es informativo: si falla, la navegación sigue disponible.
   } finally {
@@ -53,6 +65,33 @@ const hora = (iso: string) =>
         <span class="resumen__valor num">{{ citasHoy.length }}</span>
         <span class="resumen__rotulo">Citas hoy</span>
       </NuxtLink>
+    </div>
+
+    <div v-if="metricas" class="resumen">
+      <div class="resumen__tarjeta resumen__tarjeta--fija">
+        <span class="resumen__valor num">{{ metricas.citasProximas24h }}</span>
+        <span class="resumen__rotulo">Citas próximas 24 h</span>
+      </div>
+      <div class="resumen__tarjeta resumen__tarjeta--fija">
+        <span class="resumen__valor num">{{ metricas.citasProximas7dias }}</span>
+        <span class="resumen__rotulo">Citas próximos 7 días</span>
+      </div>
+      <div class="resumen__tarjeta resumen__tarjeta--fija">
+        <span class="resumen__rotulo resumen__rotulo--marca">CIE-10 frecuentes</span>
+        <ul class="metricas__lista">
+          <li v-for="c in metricas.cie10Frecuentes" :key="c.cie10">
+            <span class="num">{{ c.cie10 }}</span><span class="num">{{ c.n }}</span>
+          </li>
+        </ul>
+      </div>
+      <div class="resumen__tarjeta resumen__tarjeta--fija">
+        <span class="resumen__rotulo resumen__rotulo--marca">Consultas por profesional</span>
+        <ul class="metricas__lista">
+          <li v-for="c in metricas.consultasPorProfesional" :key="c.profesional">
+            <span>{{ c.profesional }}</span><span class="num">{{ c.n }}</span>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <section class="seccion">
@@ -145,5 +184,31 @@ const hora = (iso: string) =>
 .resumen__rotulo {
   font-size: 0.82rem;
   color: var(--texto-suave);
+}
+
+.resumen__tarjeta--fija {
+  cursor: default;
+}
+
+.resumen__rotulo--marca {
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.72rem;
+}
+
+.metricas__lista {
+  list-style: none;
+  margin: 0.35rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.88rem;
+}
+
+.metricas__lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
 }
 </style>
