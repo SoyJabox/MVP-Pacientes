@@ -65,7 +65,7 @@ else
 fi
 
 echo "5. Detalle de paciente: historia clínica"
-go /pacientes/290
+go /pacientes/64
 ab wait --text "Nueva consulta"
 check_snap "Nueva consulta" "formulario de consulta (admin)"
 
@@ -95,7 +95,7 @@ set_input "#email" "recepcion2@clinica.local"
 set_input "#password" "pass123"
 ab eval "document.querySelector('form').requestSubmit()"
 ab wait --url "**/"
-go /pacientes/290
+go /pacientes/64
 ab wait --text "Tu rol no tiene acceso"
 check_snap "Tu rol no tiene acceso" "recepción bloqueada en UI"
 if agent-browser --session "$SESS" snapshot 2>/dev/null | grep -q "Nueva consulta"; then
