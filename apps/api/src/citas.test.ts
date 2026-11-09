@@ -138,7 +138,7 @@ describe("CRUD citas", () => {
     expect(encontrada?.estado).toBe("cancelada");
   });
 
-  test("POST con profesionalId de un usuario recepcion devuelve 400", async () => {
+  test("POST con profesionalId de un usuario recepcion devuelve 403 (no es su agenda)", async () => {
     const h = await headers();
     const [recep] = await db.select().from(usuarios).where(eq(usuarios.email, "recep-citas@test.local"));
     const recepId = recep?.id ?? (await db.insert(usuarios).values({ email: "recep-citas@test.local", passwordHash: await Bun.password.hash("x12345"), rol: "recepcion" }).returning({ id: usuarios.id }))[0].id;
@@ -149,7 +149,7 @@ describe("CRUD citas", () => {
       headers: h,
       body: JSON.stringify({ pacienteId, profesionalId: recepId, fechaHora: fecha.toISOString() }),
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(403);
   });
 
   test("POST con paciente dado de baja devuelve 404", async () => {
@@ -197,6 +197,68 @@ describe("CRUD citas", () => {
       body: JSON.stringify({ pacienteId: 99999, profesionalId, fechaHora: fecha.toISOString() }),
     });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("Agenda propia: un profesional no ve ni toca la de otro", () => {
+  test("profesional: GET/POST/PATCH/DELETE sobre la agenda de otro dan 403", async () => {
+    const h = await headers();
+    // Segundo profesional
+    const [otro] = await db.select().from(usuarios).where(eq(usuarios.email, "otro-prof@test.local"));
+    const otroId = otro?.id ?? (await db.insert(usuarios).values({ email: "otro-prof@test.local", passwordHash: await Bun.password.hash("x12345"), rol: "profesional" }).returning({ id: usuarios.id }))[0].id;
+
+    // Agenda de otro: 403
+    const agenda = await app.request(`/citas?profesionalId=${otroId}&desde=${new Date().toISOString().split("T")[0]}`, { headers: h });
+    expect(agenda.status).toBe(403);
+
+    // Cita propia para poder probar PATCH/DELETE cruzados
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 8);
+    const creada = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, profesionalId, fechaHora: fecha.toISOString() }),
+    });
+    expect(creada.status).toBe(201);
+    const { id } = await creada.json<{ id: number }>();
+
+    // Crear cita para otro profesional: 403
+    const crearOtro = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, profesionalId: otroId, fechaHora: fecha.toISOString() }),
+    });
+    expect(crearOtro.status).toBe(403);
+
+    // El otro profesional (con su token) no puede tocar mi cita
+    const tokenOtro = await emitirJwt(otroId, "profesional");
+    const hOtro = { Authorization: `Bearer ${tokenOtro}`, "Content-Type": "application/json" };
+    const patch = await app.request(`/citas/${id}`, { method: "PATCH", headers: hOtro, body: JSON.stringify({ estado: "atendida" }) });
+    expect(patch.status).toBe(403);
+    const del = await app.request(`/citas/${id}`, { method: "DELETE", headers: hOtro });
+    expect(del.status).toBe(403);
+    const agendaOtro = await app.request(`/citas?profesionalId=${profesionalId}&desde=${new Date().toISOString().split("T")[0]}`, { headers: hOtro });
+    expect(agendaOtro.status).toBe(403);
+  });
+
+  test("admin y recepción sí pueden ver y gestionar cualquier agenda", async () => {
+    const [existente] = await db.select().from(usuarios).where(eq(usuarios.rol, "admin"));
+    const adminId = existente?.id ?? (await db.insert(usuarios).values({ email: "citas-admin@test.local", passwordHash: await Bun.password.hash("x12345"), rol: "admin" }).returning({ id: usuarios.id }))[0].id;
+    const [admin] = await db.select().from(usuarios).where(eq(usuarios.id, adminId));
+    expect(admin).toBeTruthy();
+    const tokenAdmin = await emitirJwt(admin!.id, "admin");
+    const res = await app.request(`/citas?profesionalId=${profesionalId}&desde=${new Date().toISOString().split("T")[0]}`, {
+      headers: { Authorization: `Bearer ${tokenAdmin}` },
+    });
+    expect(res.status).toBe(200);
+    const [recep] = await db.select().from(usuarios).where(eq(usuarios.email, "recep-citas@test.local"));
+    if (recep) {
+      const tokenRecep = await emitirJwt(recep.id, "recepcion");
+      const resRecep = await app.request(`/citas?profesionalId=${profesionalId}&desde=${new Date().toISOString().split("T")[0]}`, {
+        headers: { Authorization: `Bearer ${tokenRecep}` },
+      });
+      expect(resRecep.status).toBe(200);
+    }
   });
 });
 

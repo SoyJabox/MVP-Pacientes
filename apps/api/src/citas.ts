@@ -4,11 +4,17 @@ import { and, eq, between } from "drizzle-orm";
 import { db } from "./db/client";
 import { citas, pacientes, usuarios } from "./db/schema";
 import type { EnvAuth } from "./auth";
+import type { Rol } from "@gestor/shared";
 import { requiereRol } from "./auth";
 import { auditar } from "./auditoria";
 
 // RBAC: recepción NO accede a datos clínicos. Solo admin y profesional.
 const soloClinicos = requiereRol("admin", "profesional");
+
+// Cada profesional ve y gestiona SOLO su agenda: "chusmear" la de otro no.
+// Admin y recepción (cuyo trabajo es agendar) ven cualquier agenda.
+const puedeAgendaDe = (usuario: { sub: number; rol: Rol }, profesionalId: number) =>
+  usuario.rol !== "profesional" || usuario.sub === profesionalId;
 
 const crearCitaSchema = z.object({
   pacienteId: z.number().int().positive(),
@@ -28,6 +34,9 @@ citasRouter.get("/citas", async (c) => {
   const hasta = c.req.query("hasta");
 
   if (!profesionalId) return c.json({ error: "profesionalId requerido" }, 400);
+  if (!puedeAgendaDe(c.get("usuario"), profesionalId)) {
+    return c.json({ error: "Su rol no tiene acceso a este recurso" }, 403);
+  }
 
   // La agenda es un día local de Uruguay (UTC-3 fijo, sin horario de verano desde 2018).
   // Un rango en UTC escondería las citas nocturnas del día siguiente.
@@ -73,6 +82,10 @@ citasRouter.post("/citas", async (c) => {
 
   const { pacienteId, profesionalId, fechaHora } = parsed.data;
 
+  if (!puedeAgendaDe(c.get("usuario"), profesionalId)) {
+    return c.json({ error: "Su rol no tiene acceso a este recurso" }, 403);
+  }
+
   // Validar que el paciente existe y no fue dado de baja.
   const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(and(eq(pacientes.id, pacienteId), eq(pacientes.activo, true)));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
@@ -114,8 +127,11 @@ citasRouter.patch("/citas/:id{\\d+}", soloClinicos, async (c) => {
   const parsed = estadoSchema.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Estado inválido" }, 400);
 
-  const [actual] = await db.select({ estado: citas.estado }).from(citas).where(eq(citas.id, id));
+  const [actual] = await db.select({ estado: citas.estado, profesionalId: citas.profesionalId }).from(citas).where(eq(citas.id, id));
   if (!actual) return c.json({ error: "Cita no encontrada" }, 404);
+  if (!puedeAgendaDe(c.get("usuario"), actual.profesionalId)) {
+    return c.json({ error: "Su rol no tiene acceso a este recurso" }, 403);
+  }
   if (actual.estado === "atendida" && parsed.data.estado !== "atendida") {
     return c.json({ error: "Una cita atendida no se puede reabrir" }, 409);
   }
@@ -134,6 +150,11 @@ citasRouter.patch("/citas/:id{\\d+}", soloClinicos, async (c) => {
 // RBAC: solo admin y profesional (igual que cambiar estado por PATCH).
 citasRouter.delete("/citas/:id{\\d+}", soloClinicos, async (c) => {
   const id = Number(c.req.param("id"));
+  const [actual] = await db.select({ profesionalId: citas.profesionalId }).from(citas).where(eq(citas.id, id));
+  if (!actual) return c.json({ error: "Cita no encontrada" }, 404);
+  if (!puedeAgendaDe(c.get("usuario"), actual.profesionalId)) {
+    return c.json({ error: "Su rol no tiene acceso a este recurso" }, 403);
+  }
   const [cancelada] = await db
     .update(citas)
     .set({ estado: "cancelada" })

@@ -20,6 +20,7 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - [x] Recordatorios de citas próximas 24 h (`scripts/recordatorios.ts`)
 - [x] Métricas clínicas en el dashboard (`/estadisticas`)
 - [x] Índice trigram para la búsqueda de pacientes (`scripts/setup-trgm.sql`)
+- [x] Agenda propia: un profesional solo ve/gestiona SU agenda (403 en agenda ajena); admin y recepción ven todas
 - [ ] Piloto con datos reales (carga por UI/API; el seed cargó datos ficticios)
 - [ ] Validar entries CDA nivel 3 contra templates oficiales de Salud.uy
 
@@ -130,3 +131,11 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Hallazgos de la auditoría: ninguno abierto. BD principal purgada a 19 pacientes conocidos (9 renombrados + 8 piloto + 290 E2E + 291 Samira, del usuario).
 - Decisiones tomadas: confirmar bajas con `confirm()` nativo (sin librería); métricas solo para roles clínicos (mismo criterio que historia); test runner crea BD fresca cada vez (dropdb/createdb, determinista).
 - Siguiente paso: piloto con datos reales (carga por el usuario), validar CDA nivel 3 contra Salud.uy.
+
+## Iteración 8 — Agenda propia por profesional (corrección de acceso)
+- Objetivo: cada profesional ve y gestiona únicamente su agenda; hoy `GET /citas?profesionalId=X` aceptaba cualquier X y PATCH/DELETE no verificaban titularidad.
+- Cambios: helper `puedeAgendaDe` en `citas.ts` (profesional solo agenda propia; admin y recepción, todas — recepción agenda como parte de su trabajo); chequeo en GET, POST, PATCH y DELETE de citas; UI `agenda.vue` oculta el selector de profesional cuando el rol es profesional. Matriz RBAC actualizada con cita propia del profesional.
+- Pruebas ejecutadas y resultado: tests nuevos primero (fallaban: 403 esperado vs 200 real) → fix; `scripts/test.sh` **92/92 pass**; web build OK; verificado en vivo: prof agenda propia 200, agenda ajena 403, admin/recepción 200; `scripts/e2e.sh` todo verde (agregado paso 8: profesional sin selector).
+- Hallazgos de la auditoría: `POST /citas` con profesional ajeno ahora devuelve 403 (antes 400 por rol inválido); test actualizado. `/profesionales` sigue listando emails a cualquier rol autenticado (directorio, no datos de agenda) — decisión registrada, no es chusmerío de agenda.
+- Decisiones tomadas: admin y recepción conservan acceso total a agendas (recepción lo necesita para agendar); no se crea endpoint de agenda propia separado — el `profesionalId` sigue siendo explícito con chequeo en API.
+- Siguiente paso: piloto con datos reales, validar CDA nivel 3 contra Salud.uy.

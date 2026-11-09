@@ -103,6 +103,33 @@ fi
 
 ab close
 
+echo "8. Profesional: solo su agenda (sin selector de otro)"
+SESS=$(agent-browser session id --scope worktree --prefix e2e)
+go() { ab open "$BASE$1"; sleep 2; }
+set_input() {
+  agent-browser --session "$SESS" eval --stdin >/dev/null 2>&1 <<EOF
+(function(){ var el = document.querySelector("$1"); if(!el) return "no";
+el.focus(); el.value = "$2";
+el.dispatchEvent(new Event('input',{bubbles:true}));
+el.dispatchEvent(new Event('change',{bubbles:true})); return el.value; })();
+EOF
+  sleep 1
+}
+go /login
+set_input "#email" "prof2@clinica.local"
+set_input "#password" "pass123"
+ab eval "document.querySelector('form').requestSubmit()"
+ab wait --url "**/"
+go /agenda
+ab wait --text "Citas del día"
+check_snap "Citas del día" "profesional ve su agenda"
+if agent-browser --session "$SESS" snapshot 2>/dev/null | grep -q "label for=\"profesional\"\|Profesional</label>"; then
+  fail "profesional no ve selector de agenda ajena"
+else
+  ok "profesional no ve selector de agenda ajena"
+fi
+ab close
+
 if [ "$FALLOS" -eq 0 ]; then
   echo "E2E: todo verde"
   exit 0

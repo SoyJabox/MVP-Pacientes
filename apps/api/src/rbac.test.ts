@@ -11,6 +11,7 @@ import { app } from "./index";
 let ids: Record<"admin" | "profesional" | "recepcion", number> = { admin: 0, profesional: 0, recepcion: 0 };
 let pacienteId: number;
 let consultaId: number;
+let citaPropiaId: number;
 
 beforeAll(async () => {
   const crear = async (email: string, rol: "admin" | "profesional" | "recepcion") => {
@@ -40,6 +41,16 @@ beforeAll(async () => {
     body: JSON.stringify({ pacienteId, motivo: "Matriz" }),
   });
   consultaId = (await r.json<{ id: number }>()).id;
+
+  // Cita propia del profesional: PATCH/DELETE deben pasar para el dueño
+  // (un profesional no puede tocar la cita de otro, ver citas.ts).
+  const fecha = new Date(Date.now() + 20 * 24 * 60 * 60 * 1000);
+  const rc = await app.request("/citas", {
+    method: "POST",
+    headers: h,
+    body: JSON.stringify({ pacienteId, profesionalId: ids.profesional, fechaHora: fecha.toISOString() }),
+  });
+  citaPropiaId = (await rc.json<{ id: number }>()).id;
 });
 
 const tok = async (rol: keyof typeof ids) => ({
@@ -65,8 +76,8 @@ const casos: Caso[] = [
   { nombre: "generar CDA", metodo: "GET", ruta: () => `/consultas/${consultaId}/cda`, permitido: ["admin", "profesional"] },
   { nombre: "listar documentos", metodo: "GET", ruta: () => `/documentos/paciente/${pacienteId}`, permitido: ["admin", "profesional"] },
   { nombre: "descargar documento", metodo: "GET", ruta: () => "/documentos/1/archivo", permitido: ["admin", "profesional"] },
-  { nombre: "cambiar estado de cita", metodo: "PATCH", ruta: () => `/citas/1`, cuerpo: { estado: "atendida" }, permitido: ["admin", "profesional"] },
-  { nombre: "cancelar cita (DELETE)", metodo: "DELETE", ruta: () => `/citas/1`, permitido: ["admin", "profesional"] },
+  { nombre: "cambiar estado de cita", metodo: "PATCH", ruta: () => `/citas/${citaPropiaId}`, cuerpo: { estado: "atendida" }, permitido: ["admin", "profesional"] },
+  { nombre: "cancelar cita (DELETE)", metodo: "DELETE", ruta: () => `/citas/${citaPropiaId}`, permitido: ["admin", "profesional"] },
 ];
 
 describe("Matriz RBAC: rol × endpoint", () => {

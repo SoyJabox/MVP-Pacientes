@@ -21,6 +21,7 @@ interface PacienteOpcion {
 }
 
 const usuario = useUsuario();
+const esProfesional = computed(() => usuario.value?.rol === "profesional");
 const profesionales = ref<Profesional[]>([]);
 const profesionalId = ref<number | null>(null);
 const fecha = ref(new Date().toISOString().split("T")[0]);
@@ -41,6 +42,7 @@ onMounted(async () => {
     ]);
 
     // Arrancar en el propio usuario si es profesional; si no, el primero de la lista.
+    // Un profesional solo ve su agenda: no hay selector.
     const propio = profesionales.value.find((p) => p.id === usuario.value?.id);
     profesionalId.value = propio?.id ?? profesionales.value[0]?.id ?? null;
     await cargarCitas();
@@ -138,7 +140,7 @@ const agendadas = computed(() => citas.value.filter((c) => c.estado === "agendad
         <p class="agenda__subtitulo">{{ fechaLegible }}</p>
       </div>
 
-      <div class="agenda__filtros">
+      <div v-if="!esProfesional" class="agenda__filtros">
         <div class="campo">
           <label for="profesional">Profesional</label>
           <select id="profesional" v-model="profesionalId">
