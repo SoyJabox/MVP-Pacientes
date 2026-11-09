@@ -93,6 +93,31 @@ describe("CDA nivel 1", () => {
     expect(xml).toContain("Paciente Docs Test");
   });
 
+  test("nivel 3: diagnóstico como entry estructurado con CIE-10", async () => {
+    const xml = generarCdaNivel1({
+      paciente: { nombre: "Juan Pérez", cedula: "12345678", fechaNacimiento: "1980-04-12" },
+      profesional: { nombre: "prof@x.uy", id: 4 },
+      consulta: { id: 9, fecha: new Date("2026-11-08T14:30:00Z"), motivo: "Cefalea", evolucion: "", diagnosticoCie10: "G44.2" },
+      medicacion: [],
+    });
+    // La sección Problemas existe con su template y el entry con el CIE-10.
+    expect(xml).toContain('code code="11450-4"');
+    expect(xml).toContain('templateId root="2.16.840.1.113883.10.20.22.2.3"');
+    expect(xml).toContain("templateId root=\"2.16.840.1.113883.10.20.22.2.5\"");
+    expect(xml).toContain('xsi:type="CD"');
+    expect(xml).toContain('code="G44.2"');
+    expect(xml).toContain('codeSystem="2.16.840.1.113883.6.3"'); // ICD-10
+    // Sin diagnóstico no hay sección Problemas ni entries.
+    const sinDx = generarCdaNivel1({
+      paciente: { nombre: "A B", cedula: "11111111", fechaNacimiento: "1990-01-01" },
+      profesional: { nombre: "p@x.uy", id: 1 },
+      consulta: { id: 1, fecha: new Date(), motivo: "m", evolucion: "", diagnosticoCie10: "" },
+      medicacion: [],
+    });
+    expect(sinDx).not.toContain("Problemas");
+    expect(sinDx).not.toContain("<entry>");
+  });
+
   test("recepción NO puede generar CDA (403)", async () => {
     const res = await app.request(`/consultas/${consultaId}/cda`, { headers: await headers(recepcionId, "recepcion") });
     expect(res.status).toBe(403);

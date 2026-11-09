@@ -1,21 +1,25 @@
 # Progreso - Gestor de Pacientes
 
 ## Estado actual
-Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y verificado**. API tests: 68/68 passing. Web build exitoso. Fases 0-5 del plan completadas y verificadas end-to-end. Backup y restore scripts funcionando. Sistema listo para piloto con datos reales.
-
-**Auditoría e2e (2026-11-09): 5 must-fix, 8 should-fix, todos con evidencia reproducible.** Correcciones en curso (iteración 4).
+Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y verificado**. API tests: 81/81. Verificado en navegador real (E2E manual). BD limpia: 10 pacientes. Puertos 3001/8787 cerrados tras prueba en red local.
 
 ## Backlog
 - [x] Verificar funcionamiento completo end-to-end (API + Web)
-- [ ] Tests automatizados del frontend
 - [x] Verificar scripts de backup y restauración
 - [x] Revisar cumplimiento HCEN/CDA nivel 1
 - [x] Auditar seguridad (JWT, RBAC, auditoría, upload de archivos)
 - [x] Corregir hallazgos de auditoría e2e (iteración 4)
 - [x] Limpiar BD a máximo 10 pacientes
 - [x] Pruebas reales en navegador (E2E manual con agent-browser)
-- [ ] Probar con datos reales (piloto)
-- [x] Documentar cómo ejecutar el proyecto completamente
+- [x] Tests E2E automatizados persistentes (`scripts/e2e.sh`)
+- [x] Campo `nombre` en usuarios (firma del CDA)
+- [x] CDA nivel 3: entries estructurados de diagnóstico (CIE-10)
+- [ ] Piloto con datos reales (carga por UI/API; el seed cargó datos ficticios)
+- [ ] Validar entries CDA nivel 3 contra templates oficiales de Salud.uy
+- [ ] **P3** Gestión de usuarios en UI (crear/desactivar) — hoy solo por script
+- [ ] **P3** Botones de baja en UI (paciente/documento): endpoints sin UI
+- [ ] **P3** Limpieza automática de datos de test (cada `bun test` re-agrega pacientes/usuarios)
+- [ ] **P4** Recordatorios de citas; métricas clínicas; búsqueda trigram (>1000 pacientes)
 
 ## Iteración 1
 - Objetivo: Verificar estado actual, levantar servicios y validar funcionamiento end-to-end
@@ -79,6 +83,8 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Pruebas ejecutadas y resultado: `bun test` **81/81 pass** (129 expects, antes 68); web build OK (3.54s); re-verificación en vivo contra API reiniciada: 10/10 sondas correctas (403/409/400/404/400/400/`q=% → []`/agenda nocturna incluye cita 01:00Z/historia con medicación OK/`?limit=2 → 2`/desactivado → 401); backup 56KB + restore verificado (7 tablas coinciden).
 - Hallazgos de la auditoría: cerrados M1–M5 y S1–S8. Quedan como backlog: tests del frontend, piloto con datos reales, CDA nivel 3, campo nombre en usuarios (CDA usa email).
 - Decisiones tomadas: Tests primero por fix; Uruguay UTC-3 fijo para agenda (sin horario de verano desde 2018); `requiereAuth` chequea `activo` en BD (1 query/request, aceptable para 1 usuario).
+- Siguiente paso: ~~implementar correcciones~~ **Hecho.** Iteración 5 ejecutada.
+
 ## Iteración 5 — Limpieza a 10 pacientes + pruebas reales en navegador
 - Objetivo: reducir la BD a máximo 10 pacientes y empezar pruebas verdaderas E2E en navegador real (no solo tests de API).
 - Cambios: backup previo (`gestor_pacientes_2026-11-09_002241.dump`); borrados pacientes de prueba y sus dependientes en cascada manual (medicación, documentos, citas, consultas), conservando los 10 con más historia; renombrados a nombres realistas (María González, Juan Pérez, …) + `Paciente Real E2E`; borrados archivos huérfanos de `data/documentos`; borrados 6 usuarios huérfanos `desactivado-*` (los demás usuarios de test referencian historia conservada, quedan).
@@ -97,3 +103,14 @@ Proyecto monorepo con API (Hono) y Web (Nuxt 4) **completamente funcional y veri
 - Decisiones tomadas: conservar los 10 pacientes con más historia clínica (no los más recientes); no borrar usuarios de test que referencian historia conservada (FK).
 - Estado final: 10 pacientes, 2 citas, 28 consultas, 10 medicación, 0 documentos, 17 usuarios.
 - Siguiente paso: piloto con datos reales (carga de 5-10 pacientes reales y uso diario), o tests E2E automatizados persistentes si se quiere regresión en navegador.
+## Iteración 6 — Backlog recomendado: piloto-seed, E2E, nombre, CDA nivel 3
+- Objetivo: implementar en orden: (1) piloto cargado y listo, (2) E2E automatizado persistente, (3) nombre real en usuarios para firma del CDA, (4) CDA nivel 3 con entries estructurados.
+- Cambios:
+  - `apps/api/scripts/seed-piloto.ts` (nuevo): 8 pacientes ficticios con historia realista (consultas, medicación, citas en 7 días), idempotente por cédula. Ejecutado: 8 creados, re-ejecución salta todo. Nota: los pacientes reales se cargan por UI/API; el seed es el punto de partida del piloto.
+  - `scripts/e2e.sh` (nuevo): 11 aserciones en navegador real (redirect sin sesión, login erróneo, login admin, búsqueda que filtra, historia, agenda, logout, recepción bloqueada). Interactúa por id/label vía eval (refs de agent-browser caducan entre páginas).
+  - Columna `usuarios.nombre` (default ""), `seed-admin.ts --nombre`, CDA firma con nombre (fallback email), `/me` y login lo exponen, tipo `Usuario` actualizado. Profesionales existentes con nombre real.
+  - `cda.ts`: sección Problemas (11450-4, template 2.16.840.1.113883.10.20.22.2.3) con entry observación de problema (template 2.16.840.1.113883.10.20.22.2.5, valor CIE-10 con OID ICD-10); sección Medicación con código LOINC correcto 24326-1 (antes reusaba 10160-0). Medicación sin entry: exige diccionario de fármacos inexistente; queda narrativa, documentado en el código.
+- Pruebas ejecutadas y resultado: `bun test` **83/83 pass** (+ test nombre en CDA, + test nivel 3 con/sin diagnóstico); `scripts/e2e.sh` **todo verde** tras corrección (2 fallos iniciales por refs caducadas, corregidos); CDA verificado en vivo (entry Z00.0 con OID ICD-10).
+- Hallazgos de la auditoría: apareció un paciente `291 Samira Touch` ajeno a las pruebas del agente; no se tocó. Pacientes totales: 19 (11 previos + 8 del piloto).
+- Decisiones tomadas: entries HL7 estándar (C-CDA) pendientes de validar contra templates oficiales de Salud.uy (no disponibles localmente); no inventar OID locales ni códigos de fármaco.
+- Siguiente paso: piloto con pacientes reales (carga por el usuario), gestión de usuarios en UI (P3) y baja en UI (P3).

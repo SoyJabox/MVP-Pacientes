@@ -25,7 +25,20 @@ Crear usuarios con otros roles:
 ```bash
 cd apps/api
 bun run scripts/seed-admin.ts recepcion@clinica.local pass123 --rol recepcion
-bun run scripts/seed-admin.ts prof@clinica.local pass123 --rol profesional
+bun run scripts/seed-admin.ts prof@clinica.local pass123 --rol profesional --nombre "Dra. Luisa Prueba"
+```
+
+Cargar el set inicial del piloto (8 pacientes ficticios con historia clínica;
+idempotente, se puede re-ejecutar):
+
+```bash
+cd apps/api && bun run scripts/seed-piloto.ts
+```
+
+Pruebas E2E reales en navegador (requiere API y Web levantadas):
+
+```bash
+bash scripts/e2e.sh
 ```
 
 ## Roles
@@ -70,6 +83,9 @@ cd apps/api && bun test
 
 # build de producción del frontend
 cd apps/web && bun run build
+
+# E2E en navegador real (requiere API + Web levantadas)
+bash scripts/e2e.sh
 ```
 
 Cron sugerido para el backup diario:
@@ -101,8 +117,9 @@ Cron sugerido para el backup diario:
 
 ## Verificación completa (checklist)
 
-- [x] API tests: 68/68 pass (`cd apps/api && bun test`)
+- [x] API tests: 83/83 pass (`cd apps/api && bun test`)
 - [x] Web build: exitoso (`cd apps/web && bun run build`)
+- [x] E2E en navegador real: `bash scripts/e2e.sh` (login, pacientes, historia, agenda, recepción bloqueada)
 - [x] Login end-to-end: admin, profesional, recepcion
 - [x] RBAC: recepción bloqueada en datos clínicos, CDA, documentos, cambio estado citas
 - [x] CDA nivel 1: XML válido con cabecera HCEN, datos paciente, encuentro, medicación
@@ -114,5 +131,7 @@ Cron sugerido para el backup diario:
 
 ## Estado
 
-Fases 0 a 5 del plan completas y verificadas. Pendiente: piloto con datos reales y migración
-del CDA a nivel 3 (secciones estructuradas). Ver `tasks/plan.md`.
+Fases 0 a 5 completas y verificadas. Piloto cargado con datos ficticios realistas
+(`seed-piloto.ts`); los datos reales se cargan por la UI/API. CDA con entries
+estructurados de diagnóstico (nivel 3, templates HL7 estándar; validar contra
+los de Salud.uy cuando se disponga de su Guía de Implementación). Ver `tasks/plan.md`.

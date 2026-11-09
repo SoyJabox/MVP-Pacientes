@@ -8,6 +8,8 @@ export const usuarios = pgTable("usuarios", {
   rol: text("rol", { enum: ["admin", "recepcion", "profesional"] })
     .notNull()
     .default("recepcion"),
+  // Nombre real para firmar la historia clínica y el CDA (si falta, se usa el email).
+  nombre: text("nombre").notNull().default(""),
   activo: boolean("activo").notNull().default(true),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });

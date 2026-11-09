@@ -1,8 +1,12 @@
 import { create } from "xmlbuilder2";
 
-// CDA R2 nivel 1 (CMD mínimo de Salud.uy / HCEN).
-// Nivel 1 = documento narrativo: cabecera obligatoria + secciones en texto.
-// Los `entry` estructurados (nivel 3) quedan para una fase posterior.
+// CDA R2: CMD mínimo de Salud.uy / HCEN.
+// Nivel 1 = documento narrativo (cabecera + secciones en texto).
+// Nivel 3 = además, `entry` estructurados: acá el diagnóstico (observación de
+// problema con CIE-10). La medicación queda narrativa: un entry de fármaco
+// exige un diccionario de drogas (p. ej. RxNorm) que el consultorio no tiene.
+// Los templates de entry son HL7 estándar (C-CDA); validar contra los
+// templates propios de Salud.uy cuando se disponga de su Guía de Implementación.
 
 export interface DatosCda {
   paciente: { nombre: string; cedula: string; fechaNacimiento: string };
@@ -64,30 +68,75 @@ export function generarCdaNivel1(datos: DatosCda): string {
 
   const cuerpo = doc.ele("component").ele("structuredBody");
 
-  const seccion = (codigo: string, titulo: string) =>
-    cuerpo.ele("component").ele("section").ele("code", {
+  // Devuelve la <section> (código + título). El caller agrega <text> y, si aplica, <entry>.
+  const seccion = (codigo: string, titulo: string, templateId?: string) => {
+    const s = cuerpo.ele("component").ele("section");
+    if (templateId) s.ele("templateId", { root: templateId }).up();
+    s.ele("code", {
       code: codigo,
       codeSystem: "2.16.840.1.113883.6.1",
       displayName: titulo,
-    }).up().ele("title").txt(titulo).up().ele("text");
+    }).up().ele("title").txt(titulo).up();
+    return s;
+  };
 
-  seccion("10160-0", "Datos del paciente")
-    .ele("paragraph")
-    .txt(`${paciente.nombre} — CI ${paciente.cedula} — Nacimiento ${paciente.fechaNacimiento}`)
-    .up();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const texto = (s: ReturnType<typeof seccion>, contenido: (t: any) => void) => {
+    const t = s.ele("text");
+    contenido(t);
+  };
 
-  const encuentro = seccion("34109-9", "Encuentro");
-  encuentro.ele("paragraph").txt(`Motivo: ${consulta.motivo}`).up();
-  if (consulta.evolucion) encuentro.ele("paragraph").txt(`Evolución: ${consulta.evolucion}`).up();
-  if (consulta.diagnosticoCie10) {
-    encuentro.ele("paragraph").txt(`Diagnóstico CIE-10: ${consulta.diagnosticoCie10}`).up();
+  // Datos del paciente (solo texto, nivel 1).
+  {
+    const s = seccion("10160-0", "Datos del paciente");
+    texto(s, (t) =>
+      t.ele("paragraph").txt(`${paciente.nombre} — CI ${paciente.cedula} — Nacimiento ${paciente.fechaNacimiento}`).up(),
+    );
   }
 
+  // Encuentro (solo texto, nivel 1).
+  {
+    const s = seccion("34109-9", "Encuentro");
+    texto(s, (t) => {
+      t.ele("paragraph").txt(`Motivo: ${consulta.motivo}`).up();
+      if (consulta.evolucion) t.ele("paragraph").txt(`Evolución: ${consulta.evolucion}`).up();
+      if (consulta.diagnosticoCie10) {
+        t.ele("paragraph").txt(`Diagnóstico CIE-10: ${consulta.diagnosticoCie10}`).up();
+      }
+    });
+  }
+
+  // Problemas: texto + entry estructurado de diagnóstico (nivel 3).
+  if (consulta.diagnosticoCie10) {
+    const s = seccion("11450-4", "Problemas", "2.16.840.1.113883.10.20.22.2.3");
+    texto(s, (t) => t.ele("paragraph").txt(`Diagnóstico: ${consulta.diagnosticoCie10}`).up());
+    s.ele("entry")
+      .ele("observation")
+      .ele("templateId", { root: "2.16.840.1.113883.10.20.22.2.5" }).up()
+      .ele("code", {
+        code: "55607000",
+        codeSystem: "2.16.840.1.113883.6.96",
+        displayName: "Problem",
+      }).up()
+      .ele("statusCode", { code: "completed", codeSystem: "2.16.840.1.113883.5.14" }).up()
+      .ele("effectiveTime", { value: ts }).up()
+      .ele("value", {
+        "xsi:type": "CD",
+        code: consulta.diagnosticoCie10,
+        codeSystem: "2.16.840.1.113883.6.3", // ICD-10
+        displayName: consulta.diagnosticoCie10,
+      }).up();
+  }
+
+  // Medicación: narrativa (ver nota de arriba). Código LOINC correcto: 24326-1.
   if (medicacion.length > 0) {
-    const lista = seccion("10160-0", "Medicación").ele("list");
-    for (const m of medicacion) {
-      lista.ele("item").txt(`${m.medicamento} — ${m.dosis}${m.duracion ? ` (${m.duracion})` : ""}`).up();
-    }
+    const s = seccion("24326-1", "Medicación", "2.16.840.1.113883.10.20.22.2.1");
+    texto(s, (t) => {
+      const lista = t.ele("list");
+      for (const m of medicacion) {
+        lista.ele("item").txt(`${m.medicamento} — ${m.dosis}${m.duracion ? ` (${m.duracion})` : ""}`).up();
+      }
+    });
   }
 
   return doc.end({ prettyPrint: true });

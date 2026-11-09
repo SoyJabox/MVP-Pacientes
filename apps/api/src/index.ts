@@ -82,7 +82,7 @@ app.post("/auth/login", async (c) => {
   if (!valido) return c.json({ error: "Credenciales inválidas" }, 401);
 
   const token = await emitirJwt(usuario.id, usuario.rol);
-  return c.json({ token, usuario: { id: usuario.id, email: usuario.email, rol: usuario.rol } });
+  return c.json({ token, usuario: { id: usuario.id, email: usuario.email, nombre: usuario.nombre, rol: usuario.rol } });
 });
 
 // Todo lo demás requiere sesión.
@@ -97,14 +97,14 @@ app.route("/", documentosRouter);
 app.get("/me", async (c) => {
   const u = c.get("usuario");
   const [fila] = await db
-    .select({ id: usuarios.id, email: usuarios.email, rol: usuarios.rol, activo: usuarios.activo })
+    .select({ id: usuarios.id, email: usuarios.email, nombre: usuarios.nombre, rol: usuarios.rol, activo: usuarios.activo })
     .from(usuarios)
     .where(eq(usuarios.id, u.sub));
 
   // Si la cuenta se desactivó después de emitir el token, la sesión muere acá.
   if (!fila || !fila.activo) return c.json({ error: "Sesión no válida" }, 401);
 
-  return c.json({ id: fila.id, email: fila.email, rol: fila.rol });
+  return c.json({ id: fila.id, email: fila.email, nombre: fila.nombre, rol: fila.rol });
 });
 
 export { app };

@@ -5,6 +5,7 @@ export type Rol = "admin" | "recepcion" | "profesional";
 export interface Usuario {
   id: number;
   email: string;
+  nombre: string;
   rol: Rol;
   activo: boolean;
 }

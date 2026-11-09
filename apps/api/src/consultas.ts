@@ -119,6 +119,7 @@ consultasRouter.get("/consultas/:id{\\d+}/cda", async (c) => {
       pacienteNacimiento: pacientes.fechaNacimiento,
       profesionalId: usuarios.id,
       profesionalEmail: usuarios.email,
+      profesionalNombreReal: usuarios.nombre,
     })
     .from(consultas)
     .innerJoin(pacientes, eq(consultas.pacienteId, pacientes.id))
@@ -138,7 +139,7 @@ consultasRouter.get("/consultas/:id{\\d+}/cda", async (c) => {
       cedula: fila.pacienteCedula,
       fechaNacimiento: fila.pacienteNacimiento,
     },
-    profesional: { nombre: fila.profesionalEmail, id: fila.profesionalId },
+    profesional: { nombre: fila.profesionalNombreReal || fila.profesionalEmail, id: fila.profesionalId },
     consulta: {
       id: fila.id,
       fecha: fila.fecha,

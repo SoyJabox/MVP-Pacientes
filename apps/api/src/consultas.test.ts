@@ -135,6 +135,26 @@ describe("Paciente dado de baja", () => {
   });
 });
 
+describe("CDA con nombre real del profesional", () => {
+  test("assignedPerson name usa usuarios.nombre y no el email", async () => {
+    const h = await headers(profesionalId, "profesional");
+    const anterior = (await db.select({ nombre: usuarios.nombre }).from(usuarios).where(eq(usuarios.id, profesionalId)))[0]?.nombre ?? "";
+    await db.update(usuarios).set({ nombre: "Dra. Luisa Prueba" }).where(eq(usuarios.id, profesionalId));
+    try {
+      const creada = await app.request("/consultas", {
+        method: "POST",
+        headers: h,
+        body: JSON.stringify({ pacienteId, motivo: "Control con nombre real" }),
+      });
+      const { id } = await creada.json<{ id: number }>();
+      const xml = await (await app.request(`/consultas/${id}/cda`, { headers: h })).text();
+      expect(xml).toContain("Dra. Luisa Prueba");
+    } finally {
+      await db.update(usuarios).set({ nombre: anterior }).where(eq(usuarios.id, profesionalId));
+    }
+  });
+});
+
 describe("Auditoría de exportación", () => {
   test("generar CDA deja accion 'exportar' en auditoría", async () => {
     const h = await headers(profesionalId, "profesional");
