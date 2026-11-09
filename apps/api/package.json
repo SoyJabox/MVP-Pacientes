@@ -8,7 +8,6 @@
   },
   "dependencies": {
     "@gestor/shared": "workspace:*",
-    "dompurify": "^3.4.17",
     "drizzle-orm": "^0.45.4",
     "hono": "^4.13.17",
     "hono-rate-limiter": "^0.5.4",

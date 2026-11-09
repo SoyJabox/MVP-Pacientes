@@ -49,6 +49,19 @@ describe("auth", () => {
 });
 
 describe("middleware", () => {
+  test("token de usuario desactivado devuelve 401 (no solo en /me)", async () => {
+    const email = `desactivado-${Date.now()}@test.local`;
+    const [creado] = await db.insert(usuarios).values({ email, passwordHash: await Bun.password.hash("x12345"), rol: "profesional" }).returning({ id: usuarios.id });
+    const token = await emitirJwt(creado.id, "profesional");
+    await db.update(usuarios).set({ activo: false }).where(eq(usuarios.id, creado.id));
+    try {
+      const res = await app.request("/pacientes", { headers: { Authorization: `Bearer ${token}` } });
+      expect(res.status).toBe(401);
+    } finally {
+      await db.update(usuarios).set({ activo: true }).where(eq(usuarios.id, creado.id));
+    }
+  });
+
   test("/me sin token devuelve 401", async () => {
     const res = await app.request("/me");
     expect(res.status).toBe(401);

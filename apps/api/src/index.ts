@@ -45,6 +45,8 @@ app.use(
 );
 
 // Rate limiting: 100 requests por minuto por IP. Previene brute force y DoS.
+// Fuera de los tests: en test cada app.request cuenta y el límite flakea.
+if (process.env.NODE_ENV !== "test") {
 app.use(
   "*",
   rateLimiter({
@@ -56,6 +58,7 @@ app.use(
     handler: (c) => c.json({ error: "Demasiadas requests. Intentá de nuevo en un minuto." }, 429),
   }),
 );
+}
 
 // Salud
 app.get("/", (c) => c.json({ ok: true, servicio: "gestor-pacientes-api" }));

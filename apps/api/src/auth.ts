@@ -1,8 +1,18 @@
 import { createMiddleware } from "hono/factory";
 import { sign, verify } from "hono/jwt";
+import { eq } from "drizzle-orm";
 import type { Rol } from "@gestor/shared";
+import { db } from "./db/client";
+import { usuarios } from "./db/schema";
 
-const JWT_SECRET = process.env.JWT_SECRET ?? "cambiar-en-produccion";
+// En producción, un secreto de relleno significa tokens forjables: no arrancar.
+if (process.env.NODE_ENV === "production") {
+  const s = process.env.JWT_SECRET;
+  if (!s || s === "cambiar-en-produccion" || s.length < 32) {
+    throw new Error("Configuración insegura: definí JWT_SECRET de al menos 32 caracteres");
+  }
+}
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-inseguro-cambiar-en-produccion-32chars";
 
 export interface PayloadJwt {
   sub: number;
@@ -44,6 +54,13 @@ export const requiereAuth = createMiddleware<EnvAuth>(async (c, next) => {
 
   const payload = await verificarJwt(token);
   if (!payload) return c.json({ error: "Token inválido o expirado" }, 401);
+
+  // Un usuario desactivado pierde acceso ya, no cuando expire su token (8 h).
+  const [u] = await db
+    .select({ activo: usuarios.activo })
+    .from(usuarios)
+    .where(eq(usuarios.id, payload.sub));
+  if (!u || !u.activo) return c.json({ error: "Sesión no válida" }, 401);
 
   c.set("usuario", payload);
   await next();

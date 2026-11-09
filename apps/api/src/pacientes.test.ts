@@ -125,6 +125,71 @@ describe("CRUD pacientes", () => {
     expect(fila?.activo).toBe(false);
   });
 
+  test("PUT con cédula de otro paciente devuelve 409 (no 500)", async () => {
+    const t = await token();
+    const a = cuerpo();
+    const creadaA = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify(a),
+    });
+    const { id: idA } = await creadaA.json<{ id: number }>();
+    const creadaB = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo()),
+    });
+    const { id: idB } = await creadaB.json<{ id: number }>();
+
+    const res = await app.request(`/pacientes/${idB}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ cedula: a.cedula }),
+    });
+    expect(res.status).toBe(409);
+    expect(idA).not.toBe(idB);
+  });
+
+  test("fechaNacimiento imposible (2020-13-45) devuelve 400", async () => {
+    const t = await token();
+    const res = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...cuerpo(), fechaNacimiento: "2020-13-45" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("nombre que solo es HTML (queda vacío al sanitizar) devuelve 400", async () => {
+    const t = await token();
+    const res = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ ...cuerpo(), nombre: "<script>alert(1)</script>" }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("búsqueda q=% no actúa como comodín (no devuelve todo)", async () => {
+    const t = await token();
+    const creada = await app.request("/pacientes", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+      body: JSON.stringify(cuerpo()),
+    });
+    const { id } = await creada.json<{ id: number }>();
+    const res = await app.request("/pacientes?q=%25", { headers: { Authorization: `Bearer ${t}` } });
+    const filas = (await res.json()) as { id: number }[];
+    expect(filas.some((f) => f.id === id)).toBe(false);
+  });
+
+  test("?limit= acota el listado (agenda necesita más de 100)", async () => {
+    const t = await token();
+    const res = await app.request("/pacientes?limit=3", { headers: { Authorization: `Bearer ${t}` } });
+    const filas = (await res.json()) as { id: number }[];
+    expect(filas.length).toBe(3);
+  });
+
   test("401 sin token", async () => {
     const res = await app.request("/pacientes");
     expect(res.status).toBe(401);

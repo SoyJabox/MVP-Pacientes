@@ -138,6 +138,54 @@ describe("CRUD citas", () => {
     expect(encontrada?.estado).toBe("cancelada");
   });
 
+  test("POST con profesionalId de un usuario recepcion devuelve 400", async () => {
+    const h = await headers();
+    const [recep] = await db.select().from(usuarios).where(eq(usuarios.email, "recep-citas@test.local"));
+    const recepId = recep?.id ?? (await db.insert(usuarios).values({ email: "recep-citas@test.local", passwordHash: await Bun.password.hash("x12345"), rol: "recepcion" }).returning({ id: usuarios.id }))[0].id;
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 6);
+    const res = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, profesionalId: recepId, fechaHora: fecha.toISOString() }),
+    });
+    expect(res.status).toBe(400);
+  });
+
+  test("POST con paciente dado de baja devuelve 404", async () => {
+    const h = await headers();
+    const cedula = String(6_000_000 + Math.floor(Math.random() * 999_999));
+    const [baja] = await db.insert(pacientes).values({ cedula, nombre: "Paciente Baja", fechaNacimiento: "1980-01-01", activo: false }).returning({ id: pacientes.id });
+    const fecha = new Date();
+    fecha.setDate(fecha.getDate() + 7);
+    const res = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId: baja.id, profesionalId, fechaHora: fecha.toISOString() }),
+    });
+    expect(res.status).toBe(404);
+  });
+
+  test("agenda: cita nocturna local (22:00 Uruguay) aparece en ese día", async () => {
+    const h = await headers();
+    // 22:00 en Uruguay (UTC-3) = 01:00Z del día siguiente. Fecha aleatoria:
+    // la BD persiste entre corridas y una fecha fija chocaría consigo misma.
+    const base = new Date();
+    base.setDate(base.getDate() + 30 + Math.floor(Math.random() * 60));
+    base.setUTCHours(1, 0, 0, Math.floor(Math.random() * 999));
+    const diaLocal = new Date(base.getTime() - 3 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const creada = await app.request("/citas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId, profesionalId, fechaHora: base.toISOString() }),
+    });
+    expect(creada.status).toBe(201);
+    const { id } = await creada.json<{ id: number }>();
+    const lista = await app.request(`/citas?profesionalId=${profesionalId}&desde=${diaLocal}`, { headers: h });
+    const filas = await lista.json<{ id: number }[]>();
+    expect(filas.some((f) => f.id === id)).toBe(true);
+  });
+
   test("POST con paciente inexistente devuelve 404", async () => {
     const h = await headers();
     const fecha = new Date();

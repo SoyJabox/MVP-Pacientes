@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import DOMPurify from "isomorphic-dompurify";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "./db/client";
 import { consultas, medicacion, pacientes, usuarios } from "./db/schema";
 import { requiereRol, type EnvAuth } from "./auth";
@@ -13,9 +13,9 @@ const consultaSchema = z.object({
   motivo: z
     .string()
     .trim()
-    .min(3)
-    .max(500)
-    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }))
+    // Longitud post-sanitize, igual que en pacientes.
+    .refine((s) => s.length >= 3 && s.length <= 500, "Motivo inválido"),
   evolucion: z
     .string()
     .trim()
@@ -31,8 +31,8 @@ const consultaSchema = z.object({
 
 const medicacionSchema = z.object({
   consultaId: z.number().int().positive(),
-  medicamento: z.string().trim().min(2).max(200),
-  dosis: z.string().trim().min(1).max(200),
+  medicamento: z.string().trim().transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })).refine((s) => s.length >= 2 && s.length <= 200, "Medicamento inválido"),
+  dosis: z.string().trim().transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })).refine((s) => s.length >= 1 && s.length <= 200, "Dosis inválida"),
   duracion: z.string().trim().max(100).default(""),
 });
 
@@ -57,7 +57,7 @@ consultasRouter.get("/consultas/paciente/:pacienteId{\\d+}", async (c) => {
   const [paciente] = await db
     .select({ id: pacientes.id })
     .from(pacientes)
-    .where(eq(pacientes.id, pacienteId));
+    .where(and(eq(pacientes.id, pacienteId), eq(pacientes.activo, true)));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
 
   const filas = await db
@@ -74,11 +74,12 @@ consultasRouter.get("/consultas/paciente/:pacienteId{\\d+}", async (c) => {
     .where(eq(consultas.pacienteId, pacienteId))
     .orderBy(desc(consultas.fecha));
 
-  const conMedicacion = await Promise.all(
-    filas.map(async (consulta) => ({
-      ...consulta,
-      medicacion: await db
+  // Una sola query de medicación para todas las consultas (no N+1).
+  const idsConsultas = filas.map((f) => f.id);
+  const todasMeds = idsConsultas.length
+    ? await db
         .select({
+          consultaId: medicacion.consultaId,
           id: medicacion.id,
           medicamento: medicacion.medicamento,
           dosis: medicacion.dosis,
@@ -86,9 +87,18 @@ consultasRouter.get("/consultas/paciente/:pacienteId{\\d+}", async (c) => {
           fechaInicio: medicacion.fechaInicio,
         })
         .from(medicacion)
-        .where(eq(medicacion.consultaId, consulta.id)),
-    })),
-  );
+        .where(inArray(medicacion.consultaId, idsConsultas))
+    : [];
+  const porConsulta = new Map<number, typeof todasMeds>();
+  for (const m of todasMeds) {
+    const lista = porConsulta.get(m.consultaId) ?? [];
+    lista.push(m);
+    porConsulta.set(m.consultaId, lista);
+  }
+  const conMedicacion = filas.map((consulta) => ({
+    ...consulta,
+    medicacion: porConsulta.get(consulta.id) ?? [],
+  }));
 
   return c.json(conMedicacion);
 });
@@ -153,7 +163,7 @@ consultasRouter.post("/consultas", async (c) => {
 
   const { pacienteId, motivo, evolucion, diagnosticoCie10 } = parsed.data;
 
-  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(eq(pacientes.id, pacienteId));
+  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(and(eq(pacientes.id, pacienteId), eq(pacientes.activo, true)));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
 
   const usuario = c.get("usuario");

@@ -37,7 +37,7 @@ onMounted(async () => {
   try {
     [profesionales.value, pacientes.value] = await Promise.all([
       $fetch<Profesional[]>("/api/profesionales"),
-      $fetch<PacienteOpcion[]>("/api/pacientes"),
+      $fetch<PacienteOpcion[]>("/api/pacientes?limit=1000"),
     ]);
 
     // Arrancar en el propio usuario si es profesional; si no, el primero de la lista.

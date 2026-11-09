@@ -66,6 +66,7 @@ const casos: Caso[] = [
   { nombre: "listar documentos", metodo: "GET", ruta: () => `/documentos/paciente/${pacienteId}`, permitido: ["admin", "profesional"] },
   { nombre: "descargar documento", metodo: "GET", ruta: () => "/documentos/1/archivo", permitido: ["admin", "profesional"] },
   { nombre: "cambiar estado de cita", metodo: "PATCH", ruta: () => `/citas/1`, cuerpo: { estado: "atendida" }, permitido: ["admin", "profesional"] },
+  { nombre: "cancelar cita (DELETE)", metodo: "DELETE", ruta: () => `/citas/1`, permitido: ["admin", "profesional"] },
 ];
 
 describe("Matriz RBAC: rol × endpoint", () => {

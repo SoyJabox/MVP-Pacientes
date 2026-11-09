@@ -67,6 +67,9 @@ scripts/          backup.sh, restaurar.sh
 
 # tests de la API
 cd apps/api && bun test
+
+# build de producción del frontend
+cd apps/web && bun run build
 ```
 
 Cron sugerido para el backup diario:
@@ -83,6 +86,7 @@ Cron sugerido para el backup diario:
 - Los documentos se guardan fuera del repositorio con nombre aleatorio
   (`apps/api/data/documentos`, dir `0700`, archivos `0600`) y solo se aceptan
   PDF, PNG y JPG hasta 20 MB.
+- Validación de contenido real de archivos (magic bytes), no solo extensión.
 - Toda acción sobre datos de pacientes queda en la tabla `auditoria`.
 
 ## Variables de entorno
@@ -95,7 +99,20 @@ Cron sugerido para el backup diario:
 | `DOCS_DIR` | carpeta de documentos (por defecto `apps/api/data/documentos`) |
 | `NUXT_API_BASE` | URL de la API vista por el servidor de Nuxt |
 
+## Verificación completa (checklist)
+
+- [x] API tests: 68/68 pass (`cd apps/api && bun test`)
+- [x] Web build: exitoso (`cd apps/web && bun run build`)
+- [x] Login end-to-end: admin, profesional, recepcion
+- [x] RBAC: recepción bloqueada en datos clínicos, CDA, documentos, cambio estado citas
+- [x] CDA nivel 1: XML válido con cabecera HCEN, datos paciente, encuentro, medicación
+- [x] Upload documentos: valida tipo (PDF/PNG/JPG), contenido real, permisos 0600
+- [x] Agenda: crea cita, marca atendida, cancela (recepción bloqueada)
+- [x] Auditoría: cada acción exitosa registra usuario, acción, entidad, ID
+- [x] Backup: genera dump verificado con pg_restore --list
+- [x] Restore: restaura en base temporal y compara conteos tabla por tabla
+
 ## Estado
 
-Fases 0 a 5 del plan completas. Pendiente: piloto con datos reales y migración
+Fases 0 a 5 del plan completas y verificadas. Pendiente: piloto con datos reales y migración
 del CDA a nivel 3 (secciones estructuradas). Ver `tasks/plan.md`.

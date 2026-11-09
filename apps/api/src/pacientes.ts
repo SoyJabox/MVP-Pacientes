@@ -7,15 +7,20 @@ import { pacientes, usuarios } from "./db/schema";
 import type { EnvAuth } from "./auth";
 import { auditar } from "./auditoria";
 
+const esFechaReal = (s: string) => {
+  const d = new Date(`${s}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === s && d.getTime() <= Date.now();
+};
+
 const pacienteSchema = z.object({
   cedula: z.string().trim().min(7).max(8).regex(/^\d{7,8}$/, "Cédula uruguaya: 7 u 8 dígitos"),
   nombre: z
     .string()
     .trim()
-    .min(2)
-    .max(120)
-    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })),
-  fechaNacimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha ISO yyyy-mm-dd"),
+    .transform((s) => DOMPurify.sanitize(s, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }))
+    // La longitud se chequea DESPUÉS de sanitizar: "<script>..</script>" queda "" y debe fallar.
+    .refine((s) => s.length >= 2 && s.length <= 120, "Nombre inválido"),
+  fechaNacimiento: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Fecha ISO yyyy-mm-dd").refine(esFechaReal, "Fecha de nacimiento inválida"),
   contacto: z
     .string()
     .trim()
@@ -44,6 +49,10 @@ pacientesRouter.use("/pacientes/*", auditar("pacientes"));
 // Búsqueda por nombre o cédula (q). Solo pacientes activos.
 pacientesRouter.get("/pacientes", async (c) => {
   const q = c.req.query("q")?.trim() ?? "";
+  // ?limit= permite a la agenda pedir más de 100 (default de la lista).
+  const limit = Math.min(Math.max(Number(c.req.query("limit")) || 100, 1), 1000);
+  // Escapar comodines de LIKE: q="%" debe buscar el carácter %, no todo.
+  const qEsc = q.replace(/[%_\\]/g, "\\$&");
   const base = db
     .select({
       id: pacientes.id,
@@ -60,11 +69,11 @@ pacientesRouter.get("/pacientes", async (c) => {
         .where(
           and(
             eq(pacientes.activo, true),
-            or(ilike(pacientes.nombre, `%${q}%`), ilike(pacientes.cedula, `%${q}%`)),
+            or(ilike(pacientes.nombre, `%${qEsc}%`), ilike(pacientes.cedula, `%${qEsc}%`)),
           ),
         )
-        .limit(100)
-    : await base.where(eq(pacientes.activo, true)).limit(100);
+        .limit(limit)
+    : await base.where(eq(pacientes.activo, true)).limit(limit);
 
   return c.json(filas);
 });
@@ -106,6 +115,12 @@ pacientesRouter.put("/pacientes/:id{\\d+}", async (c) => {
   const id = Number(c.req.param("id"));
   const parsed = pacienteActualizable.safeParse(await c.req.json().catch(() => null));
   if (!parsed.success) return c.json({ error: "Datos inválidos", detalles: parsed.error.flatten() }, 400);
+
+  // La cédula es única: cambiarla a la de otro paciente es 409, no un 500 del índice.
+  if (parsed.data.cedula) {
+    const [otro] = await db.select({ id: pacientes.id }).from(pacientes).where(eq(pacientes.cedula, parsed.data.cedula));
+    if (otro && otro.id !== id) return c.json({ error: "Ya existe un paciente con esa cédula" }, 409);
+  }
 
   const [actualizado] = await db
     .update(pacientes)

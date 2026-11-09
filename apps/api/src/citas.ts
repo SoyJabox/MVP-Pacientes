@@ -29,11 +29,20 @@ citasRouter.get("/citas", async (c) => {
 
   if (!profesionalId) return c.json({ error: "profesionalId requerido" }, 400);
 
-  // Parsear fechas en UTC para evitar problemas de zona horaria.
-  const desdeDate = desde ? new Date(desde + (desde.length === 10 ? "T00:00:00Z" : "")) : new Date();
-  desdeDate.setUTCHours(0, 0, 0, 0);
-  const hastaDate = hasta ? new Date(hasta + (hasta.length === 10 ? "T23:59:59.999Z" : "")) : new Date(desdeDate);
-  hastaDate.setUTCHours(23, 59, 59, 999);
+  // La agenda es un día local de Uruguay (UTC-3 fijo, sin horario de verano desde 2018).
+  // Un rango en UTC escondería las citas nocturnas del día siguiente.
+  const OFFSET_URUGUAY_MS = 3 * 60 * 60 * 1000;
+  const inicioDelDiaLocal = (f: string) => {
+    const [y, m, d] = f.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d, 3, 0, 0, 0));
+  };
+  const hoyLocal = new Date(Date.now() - OFFSET_URUGUAY_MS).toISOString().slice(0, 10);
+  const desdeDate = desde ? (desde.length === 10 ? inicioDelDiaLocal(desde) : new Date(desde)) : inicioDelDiaLocal(hoyLocal);
+  const hastaDate = hasta
+    ? hasta.length === 10
+      ? new Date(inicioDelDiaLocal(hasta).getTime() + 24 * 60 * 60 * 1000 - 1)
+      : new Date(hasta)
+    : new Date(desdeDate.getTime() + 24 * 60 * 60 * 1000 - 1);
 
   const filas = await db
     .select({
@@ -64,12 +73,13 @@ citasRouter.post("/citas", async (c) => {
 
   const { pacienteId, profesionalId, fechaHora } = parsed.data;
 
-  // Validar que el paciente y profesional existen.
-  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(eq(pacientes.id, pacienteId));
+  // Validar que el paciente existe y no fue dado de baja.
+  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(and(eq(pacientes.id, pacienteId), eq(pacientes.activo, true)));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
 
-  const [profesional] = await db.select({ id: usuarios.id }).from(usuarios).where(eq(usuarios.id, profesionalId));
-  if (!profesional) return c.json({ error: "Profesional no encontrado" }, 404);
+  // El profesional debe ser un usuario profesional activo (no cualquier usuario).
+  const [profesional] = await db.select({ id: usuarios.id }).from(usuarios).where(and(eq(usuarios.id, profesionalId), eq(usuarios.rol, "profesional"), eq(usuarios.activo, true)));
+  if (!profesional) return c.json({ error: "Profesional no válido" }, 400);
 
   // Chequear choque de horario: misma fecha-hora para el mismo profesional.
   const fecha = new Date(fechaHora);
@@ -121,7 +131,8 @@ citasRouter.patch("/citas/:id{\\d+}", soloClinicos, async (c) => {
 });
 
 // Cancelar cita: cambia estado a "cancelada" (no se borra).
-citasRouter.delete("/citas/:id{\\d+}", async (c) => {
+// RBAC: solo admin y profesional (igual que cambiar estado por PATCH).
+citasRouter.delete("/citas/:id{\\d+}", soloClinicos, async (c) => {
   const id = Number(c.req.param("id"));
   const [cancelada] = await db
     .update(citas)

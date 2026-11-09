@@ -82,7 +82,7 @@ documentosRouter.post("/documentos", async (c) => {
     return c.json({ error: "El contenido del archivo no coincide con el formato declarado." }, 400);
   }
 
-  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(eq(pacientes.id, pacienteId));
+  const [paciente] = await db.select({ id: pacientes.id }).from(pacientes).where(and(eq(pacientes.id, pacienteId), eq(pacientes.activo, true)));
   if (!paciente) return c.json({ error: "Paciente no encontrado" }, 404);
 
   await asegurarDir();

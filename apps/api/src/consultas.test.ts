@@ -117,6 +117,24 @@ describe("Consultas y medicación", () => {
   });
 });
 
+describe("Paciente dado de baja", () => {
+  test("crear consulta y ver historia de un dado de baja devuelve 404", async () => {
+    const h = await headers(profesionalId, "profesional");
+    const cedula = String(5_000_000 + Math.floor(Math.random() * 999_999));
+    const [baja] = await db.insert(pacientes).values({ cedula, nombre: "Paciente Baja Consultas", fechaNacimiento: "1970-01-01", activo: false }).returning({ id: pacientes.id });
+
+    const crear = await app.request("/consultas", {
+      method: "POST",
+      headers: h,
+      body: JSON.stringify({ pacienteId: baja.id, motivo: "No debería entrar" }),
+    });
+    expect(crear.status).toBe(404);
+
+    const historia = await app.request(`/consultas/paciente/${baja.id}`, { headers: h });
+    expect(historia.status).toBe(404);
+  });
+});
+
 describe("Auditoría de exportación", () => {
   test("generar CDA deja accion 'exportar' en auditoría", async () => {
     const h = await headers(profesionalId, "profesional");
